@@ -1,0 +1,63 @@
+# Wide, deep images of target fields: every frame from S3 resampled and stacked per wavelength band.
+name: build-deep
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: "Target names from pipeline/targets.py, space separated"
+        default: "barnard epsindib rwaur wise0855 rdra"
+      fov:
+        description: "Cutout size in degrees"
+        default: "0.45"
+      size:
+        description: "Output image size in degrees"
+        default: "0.4"
+      oversample:
+        description: "Output pixels per SPHEREx pixel (1 native, 2 finer)"
+        default: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        env:
+          TARGETS: ${{ inputs.targets }}
+        run: |
+          python3 -c 'import json, os; print("matrix=" + json.dumps({"target": os.environ["TARGETS"].split()}))' >> "$GITHUB_OUTPUT"
+
+  deep:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NAME: ${{ matrix.target }}-wide
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r pipeline/requirements.txt --quiet
+      - name: Image index
+        run: |
+          mkdir -p cache/merged
+          gh release download index-dr1 -p dr1_index.csv.gz -D cache/merged
+          gh release download index-qr3 -p qr3_index.csv.gz -D cache/merged
+      - name: Fetch from S3
+        run: python -m pipeline.fetch_tile --target ${{ matrix.target }} --name $NAME --fov ${{ inputs.fov }} --workers 24 --via s3 --source index --index cache/merged/dr1_index.csv.gz cache/merged/qr3_index.csv.gz
+      - name: Deep stack
+        run: python -m pipeline.deep --name $NAME --size ${{ inputs.size }} --oversample ${{ inputs.oversample }} --procs 4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deep-${{ matrix.target }}
+          path: cache/tiles/${{ matrix.target }}-wide/deep/
+          retention-days: 5
