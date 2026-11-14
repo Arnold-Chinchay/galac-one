@@ -1,12 +1,4 @@
-"""Stage 4: write a tile in the public data contract (docs/13) that the web consumes.
-
-Files in <out>/ (all little-endian):
-  manifest.json       tile metadata + array shape
-  frames.json         per-frame info, sorted by time
-  residuals.f16.bin   float16 (N,H,W)  z-score of the spectral-subtraction residual (NaN = masked)
-  science.f16.bin     float16 (N,H,W)  ZODI-subtracted image, MJy/sr (NaN = masked)
-  candidates.json     public candidate list (NEVER contains injection truth)
-"""
+"""Write a tile in the data format the web reads (see docs/13)."""
 from __future__ import annotations
 
 import json

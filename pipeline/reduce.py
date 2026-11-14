@@ -1,8 +1,4 @@
-"""Reduce one SPHEREx cutout FITS to the small arrays we actually need.
-
-Drops the EPSF table (3.8 MB of the 4 MB) and returns, per frame:
-  image (MJy/sr), variance, zodi, flags (uint32), per-pixel wavelength (um), time (MJD) and the WCS header.
-"""
+"""Reduce a SPHEREx cutout FITS to the arrays we use (drops the large EPSF table)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,20 +10,16 @@ from scipy.interpolate import RegularGridInterpolator
 
 
 def pixel_wavelength(hdr: fits.Header, wave_tab) -> tuple[np.ndarray, np.ndarray]:
-    """Per-pixel central wavelength and bandwidth (um) for the cutout, from the WCS-WAVE table.
-
-    The table is a 9x9 grid over the full detector in 0-based 'active pixel' coords (WCS 'A');
-    we map cutout pixels to that frame with CRPIXnA / CDELTnA / CRVALnA, then interpolate.
-    """
+    """Wavelength and bandwidth (um) per pixel, interpolated from the 9x9 WCS-WAVE grid."""
     ny, nx = hdr["NAXIS2"], hdr["NAXIS1"]
-    xs = np.arange(nx) + 1.0  # FITS 1-based
+    xs = np.arange(nx) + 1.0
     ys = np.arange(ny) + 1.0
     xa = (xs - hdr["CRPIX1A"]) * hdr["CDELT1A"] + hdr["CRVAL1A"]
     ya = (ys - hdr["CRPIX2A"]) * hdr["CDELT2A"] + hdr["CRVAL2A"]
 
     gx = np.asarray(wave_tab["X"][0], dtype=float)
     gy = np.asarray(wave_tab["Y"][0], dtype=float)
-    vals = np.asarray(wave_tab["VALUES"][0], dtype=float)  # (ny_grid, nx_grid, 2) per FITS TDIM (2,9,9)
+    vals = np.asarray(wave_tab["VALUES"][0], dtype=float)
     if vals.shape[-1] != 2:
         vals = np.moveaxis(vals, 0, -1)
     lam = RegularGridInterpolator((gy, gx), vals[..., 0], bounds_error=False, fill_value=None)

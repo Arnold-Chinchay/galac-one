@@ -1,8 +1,5 @@
-// Naylamp Space - one Worker: static web + light API + tile files from R2.
-// Free plan limits: 10 ms CPU/request, 100k requests/day, D1 100k writes/day -> every handler is trivial
-// and votes are accepted in batches (docs/11, docs/13).
-//
-// Injection truth (candidates.is_injection, table `injections`) is NEVER returned by any endpoint.
+// One Worker: static web, API and tile files from R2.
+// Injection truth (candidates.is_injection, table injections) is never returned by any endpoint.
 
 const CORS = {
   "access-control-allow-origin": "*",
@@ -137,7 +134,6 @@ export default {
       if (path === "/api/stats") return stats(env);
       if (path === "/api/me") return me(env, url);
 
-      // Tile files from R2: /tiles/<tile_id>/<file>. Long cache so the CDN absorbs repeat downloads.
       if (path.startsWith("/tiles/")) {
         const obj = await env.TILES.get(decodeURIComponent(path.slice(1)));
         if (!obj) return err(404, "not found");

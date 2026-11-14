@@ -1,11 +1,6 @@
-"""Build a SYNTHETIC tile in the real data contract so the front-end team can work today.
+"""Synthetic demo tile (fake sky, real spectral subtraction) for front-end development.
 
-  python -m pipeline.make_mock_tile            # writes web/public/mock-tile/ and tools/mock_seed.sql
-
-The sky is fake but the pipeline is real: it runs the actual spectral subtraction. It contains
-  - 25 static sources with different colours (must vanish in the residuals)
-  - mover-1 (bright) and mover-2 (faint): hidden synthetic objects ("injections", truth only in the SQL seed)
-  - a variable star (sinusoidal in time) and a one-frame artifact: NOT injections
+    python -m pipeline.make_mock_tile
 """
 from __future__ import annotations
 

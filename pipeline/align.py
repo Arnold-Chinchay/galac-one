@@ -1,17 +1,6 @@
-"""Stage 2: put every frame of a tile on one common pixel grid, subtract ZODI, mask bad pixels.
+"""Put every frame of a tile on one pixel grid, subtract ZODI and mask bad pixels.
 
-  python -m pipeline.align --name wise0855
-
-Reads  cache/tiles/<name>/frames.json + frame_XXXX.npz   (from fetch_tile.py)
-Writes cache/tiles/<name>/aligned.npz:
-  image  (N,H,W) float32  MJy/sr, ZODI-subtracted, NaN where masked or outside the frame
-  var    (N,H,W) float32
-  lam    (N,H,W) float32  central wavelength per pixel (um)
-  flags  (N,H,W) uint32   original FLAGS (nearest neighbour)
-  mjd, det, bad_frac (N,), wcs (str)  -- all sorted by time
-
-FLAGS bits verified 14-nov-2026 against the MSKN/MSKD keywords of a real cutout (docs/12).
-SOURCE (21), FULLSAMPLE (12) are NOT masked: SOURCE is information, not an artifact.
+    python -m pipeline.align --name wise0855
 """
 from __future__ import annotations
 
@@ -37,7 +26,7 @@ BAD_MASK = np.uint32(sum(1 << b for b in BAD_BITS))
 
 def reference_wcs(ra: float, dec: float, grid_fov_deg: float) -> tuple[WCS, tuple[int, int]]:
     n = int(round(grid_fov_deg * 3600 / PIX_ARCSEC))
-    n += n % 2  # even size
+    n += n % 2
     w = WCS(naxis=2)
     w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
     w.wcs.crval = [ra, dec]
@@ -59,17 +48,14 @@ def align_frame(npz, wcs_in: WCS, wcs_out: WCS, shape_out: tuple[int, int], bg_s
     zod, _ = rp(npz["zodi"].astype(np.float64), "bilinear")
     var, _ = rp(npz["variance"].astype(np.float64), "bilinear")
     lam, _ = rp(npz["lam"].astype(np.float64), "bilinear")
-    flg, _ = rp(npz["flags"].astype(np.float64), "nearest-neighbor")  # float64 keeps 28 bits exact
+    flg, _ = rp(npz["flags"].astype(np.float64), "nearest-neighbor")
     inside = fp > 0.5
     flags = np.where(inside & np.isfinite(flg), flg, 0).astype(np.uint32)
     bad = (~inside) | ((flags & BAD_MASK) != 0) | ~np.isfinite(img)
-    # a bilinear neighbour of a bad pixel is also suspect: grow the mask by 1 px
     grown = bad.copy()
     grown[1:, :] |= bad[:-1, :]; grown[:-1, :] |= bad[1:, :]
     grown[:, 1:] |= bad[:, :-1]; grown[:, :-1] |= bad[:, 1:]
     clean = np.where(grown, np.nan, img - zod)
-    # per-frame background: the residual zodiacal light changes with time and wavelength and is spatially
-    # smooth, so it shows up as a frame-wide offset that a per-pixel spectrum cannot model.
     bg = float(np.nanmedian(clean)) if bg_sub and np.isfinite(clean).any() else 0.0
     clean = (clean - bg).astype(np.float32)
     return {"image": clean, "var": np.where(grown, np.nan, var).astype(np.float32),

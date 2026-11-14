@@ -1,12 +1,7 @@
 name: build-index
 
-# Builds/updates our spatial index of SPHEREx Level-2 images by reading only the FITS headers
-# (range reads, ~31 KB/file) from the public AWS bucket nasa-irsa-spherex. See pipeline/s3index.py.
-# Result: GitHub Release "index-<release>" holding <release>_index.csv.gz.
-#
-# INCREMENTAL: it downloads the previous index, indexes only weeks that are not in it yet
-# (plus the 2 newest weeks already in it, which may have been partial), and merges.
-# SCHEDULED: every Monday it refreshes QR3, the release that keeps growing weekly.
+# Spatial index of SPHEREx images (pipeline/s3index.py), published as the release index-<release>.
+# Incremental: only new weeks and the 2 newest existing ones are indexed. Runs every Monday for qr3.
 
 on:
   schedule:

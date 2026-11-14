@@ -1,16 +1,6 @@
-"""Stage 3: spectral subtraction (docs/10, innovation 1).
+"""Spectral subtraction: fit a static spectrum per pixel across frames and subtract it.
 
-SPHEREx sees every sky position at a different wavelength in every frame, so subtracting two frames
-leaves residuals from every star. Instead, for EVERY pixel we fit the static spectrum
-    s_p(lambda)
-through all frames that cover it (robustly: outliers are clipped out of the fit, so a mover or a
-variable cannot hide inside the model), then subtract the model at each frame's own wavelength.
-What is left is what changed: movers, variables, artifacts.
-
-Model: piecewise-linear ("hat") basis in log(lambda) with a second-difference smoothness penalty,
-solved for all pixels at once with batched normal equations.
-
-  python -m pipeline.spectral_sub --name wise0855
+    python -m pipeline.spectral_sub --name wise0855
 """
 from __future__ import annotations
 
@@ -24,16 +14,16 @@ from .irsa import CACHE
 
 @dataclass
 class SubResult:
-    model: np.ndarray    # (N,H,W) static spectrum evaluated at each frame's wavelength
-    resid: np.ndarray    # (N,H,W) image - model
-    z: np.ndarray        # (N,H,W) resid / robust per-pixel scatter
-    sigma: np.ndarray    # (H,W)   robust per-pixel scatter of the residuals
-    used: np.ndarray     # (N,H,W) bool, frames that were kept in the fit (not clipped)
-    frame_scale: np.ndarray | None = None   # (N,) relative noise of each frame (noise = sigma[p] * frame_scale[i])
+    model: np.ndarray
+    resid: np.ndarray
+    z: np.ndarray
+    sigma: np.ndarray
+    used: np.ndarray
+    frame_scale: np.ndarray | None = None
 
 
 def hat_basis(lam: np.ndarray, nodes: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """For each lam return (left node index, weight of the right node) for linear interpolation in log-lambda."""
+    """Left node index and right-node weight for linear interpolation in log(lambda)."""
     x = np.log(lam)
     k = np.clip(np.searchsorted(nodes, x) - 1, 0, len(nodes) - 2)
     t = np.clip((x - nodes[k]) / (nodes[k + 1] - nodes[k]), 0.0, 1.0)
@@ -42,15 +32,14 @@ def hat_basis(lam: np.ndarray, nodes: np.ndarray) -> tuple[np.ndarray, np.ndarra
 
 def fit_static(image: np.ndarray, lam: np.ndarray, n_nodes: int = 24, smooth: float = 1e-2,
                clip: float = 4.0, n_iter: int = 5) -> SubResult:
-    """image, lam: (N,H,W); NaN in image = masked. Returns the robust static-spectrum fit per pixel."""
+    """Robust per-pixel static spectrum. image and lam are (N,H,W); NaN in image means masked."""
     N, H, W = image.shape
     valid0 = np.isfinite(image) & np.isfinite(lam) & (lam > 0)
     lam_ok = np.where(valid0, lam, np.nanmedian(lam))
     lo, hi = np.log(np.nanmin(lam[valid0])), np.log(np.nanmax(lam[valid0]))
     nodes = np.linspace(lo, hi, n_nodes)
-    k, t = hat_basis(lam_ok, nodes)                       # (N,H,W)
+    k, t = hat_basis(lam_ok, nodes)
 
-    # second-difference penalty (same for every pixel), scaled per pixel by its weight sum
     D = np.zeros((n_nodes - 2, n_nodes))
     for i in range(n_nodes - 2):
         D[i, i:i + 3] = [1, -2, 1]
@@ -61,12 +50,12 @@ def fit_static(image: np.ndarray, lam: np.ndarray, n_nodes: int = 24, smooth: fl
     sigma = np.full((H, W), np.nan)
     model = np.zeros_like(y)
 
-    s_f = np.ones(N)                                       # per-frame noise scale (real data: noise varies a lot by frame)
+    s_f = np.ones(N)
     for it in range(n_iter):
-        w = keep / (s_f[:, None, None] ** 2)               # weighted least squares: noisy frames count less
+        w = keep / (s_f[:, None, None] ** 2)
         A = np.zeros((H, W, n_nodes, n_nodes))
         b = np.zeros((H, W, n_nodes))
-        for i in range(N):                                 # banded accumulation, 2 nonzeros per frame
+        for i in range(N):
             wi, yi, ki, ti = w[i], y[i], k[i], t[i]
             c0, c1 = 1 - ti, ti
             hh, ww = np.indices((H, W))
@@ -80,7 +69,7 @@ def fit_static(image: np.ndarray, lam: np.ndarray, n_nodes: int = 24, smooth: fl
         hh, ww = np.indices((H, W))
         model = (coef[hh[None], ww[None], k] * (1 - t) + coef[hh[None], ww[None], k + 1] * t)
         r = np.where(valid0, y - model, np.nan)
-        for _ in range(2):                                  # noise = sigma[pixel] * s_f[frame], estimated alternately
+        for _ in range(2):
             rn = r / s_f[:, None, None]
             sigma = np.maximum(1.4826 * np.nanmedian(np.abs(rn - np.nanmedian(rn, axis=0)), axis=0), 1e-6)
             s_f = 1.4826 * np.nanmedian(np.abs(r / sigma[None]), axis=(1, 2))
@@ -95,7 +84,7 @@ def fit_static(image: np.ndarray, lam: np.ndarray, n_nodes: int = 24, smooth: fl
 
 
 def diagnostics(res: SubResult, image: np.ndarray) -> dict:
-    """How much of the frame-to-frame variation is explained by the static spectra."""
+    """Summary statistics of the fit."""
     raw = np.nanstd(image, axis=0)
     after = np.nanstd(res.resid, axis=0)
     bright = raw > np.nanpercentile(raw, 75)
@@ -111,9 +100,7 @@ def diagnostics(res: SubResult, image: np.ndarray) -> dict:
 
 
 def bad_frame_mask(res: SubResult, det: np.ndarray, thresh: float = 0.15, max_rel_scale: float = 3.0) -> np.ndarray:
-    """True for broken frames: far noisier than the typical frame OF THE SAME DETECTOR (D6 is legitimately
-    ~3x noisier than D4) or with a large share of pixels far from the model. Weighting already stops them
-    from distorting the fit; dropping them stops them from producing false candidates."""
+    """Frames much noisier than the median of their own detector, or mostly far from the model."""
     frac = np.array([np.nanmean(np.abs(res.z[i]) > 5) if np.isfinite(res.z[i]).any() else 1.0 for i in range(len(res.z))])
     noisy = np.zeros(len(res.z), bool)
     if res.frame_scale is not None:

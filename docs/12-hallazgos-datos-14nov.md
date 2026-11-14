@@ -86,3 +86,20 @@ Descargamos y procesamos el campo real (`python -m pipeline.fetch_tile --name wi
 5. **No encontramos a WISE 0855.** En la posición esperada hay una **estrella azul brillante** (~50σ en D1-D4, flujo que baja con λ), que no puede ser WISE 0855 (invisible por debajo de ~3.5 µm). Prueba que falta hacer: buscar una fuente **muy roja** (cociente D6/D1 enorme) cerca de esa posición. La posición predicha usa un movimiento propio de la literatura que **no verificamos** [verificar].
 
 **Pendiente inmediato:** validar la resta espectral en R Draconis/Barnard; añadir rechazo de cuadros rotos y resta de fondo por cuadro; centrado por movimiento propio.
+
+## 8. Segunda prueba con cielo real: R Draconis (campo denso)
+Descarga: 297/297 cuadros (1 de cada 8), 0 fallos, 10 min. Alineado: 294. La resta espectral descartó 12 cuadros rotos y dejó **282**.
+
+**Bien:** las colas bajaron a 0.1–0.4 % en todos los detectores y el ruido normalizado quedó en 1.01. Gracias a eso, un píxel ruidoso no genera falsos candidatos.
+
+**Mal:** en las estrellas brillantes la resta **no las elimina**. Reducción de la variación en píxeles brillantes: **×1.3** (en el cielo sintético fue ×55).
+- El residuo en las 4 fuentes más brillantes es 30–70 veces el ruido formal y ~50 % de su flujo.
+- No es ruido: es un error multiplicativo. Causa más probable: la PSF está **mal muestreada** (píxeles de 6.15″ con FWHM similar), así que cada cuadro ve la estrella con una fase de subpíxel distinta, más el remuestreo bilineal del alineado y la PSF distinta por detector.
+- Hay píxeles de estrellas **enmascarados en todos los cuadros** de algunas bandas (saturación), por eso aparecen NaN.
+
+**Consecuencia:** el método sirve en zonas de cielo débil (donde está el 70 % de los píxeles de este campo) y **pierde sensibilidad cerca de estrellas brillantes**. Para objetos que se mueven es aceptable; para variables brillantes (R Draconis) no.
+
+**Opciones a probar (en este orden):**
+1. Ajustar el modelo sobre el **flujo sumado en 3×3 píxeles** (insensible a la fase de subpíxel).
+2. Alinear con un remuestreo que conserve mejor el flujo, o no remuestrear y comparar en el plano de cada detector.
+3. Marcar como "no fiables" los píxeles con residuo muy mayor que el ruido, y descartar ahí los candidatos.

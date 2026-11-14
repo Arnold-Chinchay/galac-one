@@ -1,10 +1,6 @@
-"""Stage 1: download + reduce every frame covering a sky position.
+"""Download and reduce every frame that covers a sky position.
 
-  python -m pipeline.fetch_tile --name wise0855 --ra 133.79513 --dec -7.24515 --fov 0.1
-  python -m pipeline.fetch_tile --name test --ra .. --dec .. --fov 0.1 --frames-json my_frames.json   # TAP down
-
-Output (cache/tiles/<name>/): frames.json (sorted by time) + one reduced .npz per frame.
-Alignment, spectral subtraction and export come in later stages.
+    python -m pipeline.fetch_tile --name wise0855 --ra 133.79513 --dec -7.24515 --fov 0.1
 """
 from __future__ import annotations
 

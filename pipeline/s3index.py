@@ -1,16 +1,8 @@
-"""Build our own spatial index of SPHEREx Level-2 images straight from the public AWS bucket.
+"""Spatial index of SPHEREx Level-2 images built from the headers in the public S3 bucket.
 
-Why: IRSA TAP/SIA were down (502) on 14-nov-2026, and TAP is the only official way to know
-which images cover a sky position. The AWS Open Data bucket `nasa-irsa-spherex` has every file
-but no spatial index. Each FITS starts with the IMAGE header (WCS, time, detector), so a ~29 KB
-HTTP range read per file is enough to index it (no 65 MB download).
+    python -m pipeline.s3index --release dr1 --weeks 2025W18_1B
 
-  python -m pipeline.s3index --release dr1 --weeks 2025W18_1B          # one week
-  python -m pipeline.s3index --release dr1 --week-slice 0:10           # weeks 0..9 (for CI matrix)
-  python -m pipeline.s3index --release dr1 --list-weeks                # print week prefixes
-
-Output: cache/index/<release>/<week>.csv.gz with one row per image:
-  key, obsid, det, mjd, ra_c, dec_c, ra1, dec1, ra2, dec2, ra3, dec3, ra4, dec4
+Writes cache/index/<release>/<week>.csv.gz, one row per image (key, obsid, det, mjd, center, 4 corners).
 """
 from __future__ import annotations
 
@@ -33,7 +25,7 @@ from botocore.config import Config
 warnings.simplefilter("ignore", FITSFixedWarning)
 
 BUCKET = "nasa-irsa-spherex"
-HEADER_BYTES = 31_000  # primary (2880) + IMAGE header (~292 cards = 9 blocks) with margin
+HEADER_BYTES = 31_000
 OUT = Path(__file__).resolve().parent.parent / "cache" / "index"
 COLS = ["key", "obsid", "det", "mjd", "ra_c", "dec_c", "ra1", "dec1", "ra2", "dec2", "ra3", "dec3", "ra4", "dec4"]
 

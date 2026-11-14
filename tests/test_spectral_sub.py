@@ -1,11 +1,6 @@
-"""Synthetic validation of spectral subtraction (known answer).
+"""Spectral subtraction on a synthetic sky with a known moving object.
 
-Sky: static sources with different power-law/blackbody-like spectra, a constant background,
-frames at many wavelengths (like the LVF), Gaussian noise, plus ONE injected moving object.
-Expected: static structure disappears (rms drops a lot), residual noise is ~N(0,1) in z,
-the mover is recovered at its true positions, and no static source leaves a residual.
-
-  python tests/test_spectral_sub.py
+    python tests/test_spectral_sub.py
 """
 from __future__ import annotations
 

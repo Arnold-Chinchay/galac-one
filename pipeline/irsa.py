@@ -1,12 +1,4 @@
-"""IRSA access: frame discovery (TAP, with retries + cache) and cutout download.
-
-Lessons verified 14-nov-2026 (see docs/12):
-- TAP can return 502 for long stretches -> always cache, always retry, and allow a
-  hand-made frames JSON as fallback (see fetch_tile.py --frames-json).
-- Cutouts work on a different backend (/ibe/), ~4 MB each (the EPSF table dominates),
-  ~12 s each, no CORS -> must be downloaded server-side (GitHub Actions), never from the browser.
-- No extension selection is possible in the cutout URL.
-"""
+"""IRSA TAP queries and cutout downloads, with retries and a local cache."""
 from __future__ import annotations
 
 import hashlib
