@@ -32,7 +32,7 @@ async function tileCandidates(env, tileId) {
             SUM(v.label='moving') AS n_moving, SUM(v.label='variable') AS n_variable,
             SUM(v.label='artifact') AS n_artifact, SUM(v.label='unsure') AS n_unsure, COUNT(v.id) AS n_votes
      FROM candidates c LEFT JOIN votes v ON v.candidate_id = c.id
-     WHERE c.tile_id = ?1 GROUP BY c.id ORDER BY c.score DESC LIMIT 500`
+     WHERE c.tile_id = ?1 GROUP BY c.id ORDER BY c.id LIMIT 500`
   ).bind(tileId).all();
   return json({ tile_id: tileId, candidates: results.map((r) => ({ ...r, track: parseTrack(r.track) })) });
 }
