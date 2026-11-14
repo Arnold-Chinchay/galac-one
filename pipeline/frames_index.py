@@ -16,6 +16,12 @@ IBE = "https://irsa.ipac.caltech.edu/ibe/data/spherex/"
 _cache: dict[str, np.ndarray] = {}
 
 
+def load_merged(paths: list[Path]) -> dict[str, np.ndarray]:
+    """Load several index files (e.g. DR1 + QR3 release assets) as one index."""
+    parts = [load_index(path=Path(p)) for p in paths]
+    return {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
+
+
 def load_index(release: str = "dr1", path: Path | None = None) -> dict[str, np.ndarray]:
     """Load either a merged index file or every per-week file of a release."""
     files = [path] if path else sorted((INDEX_DIR / release).glob("*.csv.gz"))

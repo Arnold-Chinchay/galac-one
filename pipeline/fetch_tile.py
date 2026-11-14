@@ -46,7 +46,7 @@ def main() -> None:
     ap.add_argument("--source", choices=["auto", "tap", "index"], default="auto",
                     help="auto = IRSA TAP if it is up, else our S3 index (pipeline/s3index.py)")
     ap.add_argument("--release", default="dr1")
-    ap.add_argument("--index", help="path to a merged index .csv.gz (default: cache/index/<release>/*.csv.gz)")
+    ap.add_argument("--index", nargs="+", help="index .csv.gz file(s), e.g. cache/merged/dr1_index.csv.gz cache/merged/qr3_index.csv.gz")
     a = ap.parse_args()
 
     if a.frames_json:
@@ -56,8 +56,8 @@ def main() -> None:
         frames = query_frames(a.ra, a.dec)
         print(f"frames from IRSA TAP: {len(frames)}")
     else:
-        from .frames_index import frames_at, load_index
-        idx = load_index(a.release, Path(a.index) if a.index else None)
+        from .frames_index import frames_at, load_index, load_merged
+        idx = load_merged(a.index) if a.index else load_index(a.release)
         frames = frames_at(a.ra, a.dec, idx, margin_deg=a.fov / 2)
         print(f"frames from our S3 index ({len(idx['key'])} images indexed): {len(frames)}")
     if a.max_frames:
