@@ -15,7 +15,7 @@ Diseño simple, celular primero, en inglés.
 ## Mosaicos
 - `mock`: cielo falso con respuestas conocidas (`/mock-tile/`). Aquí `kind_hint` y `score` tienen valores.
 - Reales (`/tiles/<id>/`): `rdra` (R Draconis), `barnard`, `epsindib` (Epsilon Indi B), `rwaur` (RW Aurigae), `wise0855`. Entre 250 y 438 cuadros de 40×40 px y 11 a 37 candidatos. Aquí `kind_hint` y `score` son `null` a propósito.
-- Archivos extra en algunos mosaicos: `lightcurve.json` (`rdra`, `rwaur`: `points` = `[mjd, brillo relativo, detector]`, `period`) y `propermotion.json` (`barnard`, `epsindib`: `pm_mas_yr`, `err_mas_yr`, `reference_mas_yr` de Gaia, `points` = `[mjd, dRA mas, dDec mas]`). Son buenos para un gráfico sencillo.
+- Archivos extra en algunos mosaicos: `lightcurve.json` (`rdra`, `rwaur`: `points` = `[mjd, brillo relativo, detector]`, `period`) y `propermotion.json` (`barnard`, `epsindib`: `pm_mas_yr`, `err_mas_yr`, `reference_mas_yr` de Gaia, `points` = `[mjd, dRA mas, dDec mas]`). Son buenos para un gráfico sencillo. `wise0855` trae `redsearch.json`: fuentes muy rojas con su espectro de exceso por banda (`spectrum`), movimiento (`motion`) y `y_dwarf_like`; WISE 0855 es la que tiene `y_dwarf_like: true`.
 
 ## API
 | Ruta | Devuelve |

@@ -26,7 +26,7 @@ Datos leídos directo desde S3 en GitHub Actions (`build-tile`, ~2 min por campo
 | Epsilon Indi B (> 2.4 µm) | 4.70 ± 0.06 ″/año | Gaia 4.68 (+0.4 %, dirección 0.6°) |
 | R Draconis (saturada 6 px; halo 7-10 px) | periodo 238 d, ~1.1 mag, 260 cuadros | ~245 d en GCVS **[sin verificar: CDS caído]** |
 | RW Aurigae (anillo 2-5 px) | ~1 mag de variación, 316 cuadros; sin periodo claro | T Tauri, irregular |
-| WISE 0855 | **no encontrada**: en su posición hay una estrella azul (más brillante en λ cortas) | — |
+| WISE 0855 (`redsearch.py`, campo de 0.2°) | **detectada a ciegas**: la única de 19 fuentes rojas con espectro tipo Y (0 en 2.5-3.5 µm, 11.6σ a 4.0-4.7 µm) y la única que se mueve: (−10.4, +1.3) ± 1.3 ″/año, p = 0.024 contra divisiones al azar. Tiene una estrella azul de fondo encima | ~(−8.1, +0.7) ″/año **[de memoria, sin verificar; paralaje 0.45″ sin corregir]** |
 
 Las estrellas brillantes saturan: hay que usar alas o halo. La astrometría de Gaia está en `pipeline/targets.py` (WISE 0855 no está en Gaia; su movimiento propio es aproximado).
 
@@ -44,5 +44,5 @@ Las estrellas brillantes saturan: hay que usar alas o halo. La astrometría de G
 - D1 `naylamp-db` (tablas en `migrations/`), R2 `naylamp-tiles`.
 
 ## Pendiente
-- WISE 0855 sin encontrar (campo casi vacío; probar buscar una fuente muy roja, D6/D1 alto, cerca de la posición con movimiento propio **[sin verificar]**).
+- Verificar el movimiento propio de WISE 0855 con CatWISE cuando IRSA TAP funcione; corregir su paralaje.
 - Medir completitud con más inyecciones y más campos; interfaz de front.
