@@ -8,3 +8,5 @@ requests
 boto3
 tqdm
 drizzle
+pyavm
+Pillow

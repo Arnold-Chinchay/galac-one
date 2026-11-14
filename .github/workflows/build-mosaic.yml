@@ -1,0 +1,114 @@
+# Seamless deep mosaic of a sky region: one job per overlapping cell, then a join into HiPS tiles.
+name: build-mosaic
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "Mosaic name (folder in the outputs)"
+        default: "barnard"
+      ra:
+        description: "Region centre RA (deg)"
+        default: "269.452"
+      dec:
+        description: "Region centre Dec (deg)"
+        default: "4.693"
+      size:
+        description: "Region width in degrees"
+        default: "2"
+      hf_repo:
+        description: "Hugging Face dataset to upload to (owner/name); empty = artifact only"
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install numpy astropy --quiet
+      - id: m
+        run: |
+          python -c 'import json,sys; from pipeline.mosaic import cells; print("matrix=" + json.dumps({"cell": cells(float(sys.argv[1]), float(sys.argv[2]), float(sys.argv[3]), 0.34)}))' ${{ inputs.ra }} ${{ inputs.dec }} ${{ inputs.size }} >> "$GITHUB_OUTPUT"
+        env:
+          PYTHONPATH: .
+
+  cell:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NAME: ${{ inputs.name }}-${{ matrix.cell.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r pipeline/requirements.txt --quiet
+      - name: Image index
+        run: |
+          mkdir -p cache/merged
+          gh release download index-dr1 -p dr1_index.csv.gz -D cache/merged
+          gh release download index-qr3 -p qr3_index.csv.gz -D cache/merged
+      - name: Fetch from S3
+        run: python -m pipeline.fetch_tile --ra ${{ matrix.cell.ra }} --dec ${{ matrix.cell.dec }} --name $NAME --fov 0.45 --workers 24 --via s3 --source index --index cache/merged/dr1_index.csv.gz cache/merged/qr3_index.csv.gz
+      - name: Deep stack
+        run: python -m pipeline.deep --name $NAME --size 0.4 --oversample 2 --method drizzle --procs 4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cell-${{ matrix.cell.name }}
+          path: |
+            cache/tiles/${{ env.NAME }}/deep/deep.json
+            cache/tiles/${{ env.NAME }}/deep/deep_*.f16.bin
+          retention-days: 3
+
+  join:
+    needs: cell
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r pipeline/requirements.txt huggingface_hub --quiet
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cell-*
+          path: cells
+      - name: Join and cut HiPS
+        run: python -m pipeline.mosaic join --ra ${{ inputs.ra }} --dec ${{ inputs.dec }} --size ${{ inputs.size }} --cells cells --out out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mosaic-${{ inputs.name }}
+          path: |
+            out/hips/
+            out/mosaic.json
+          retention-days: 5
+      - name: Upload to Hugging Face
+        if: inputs.hf_repo != ''
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          REPO: ${{ inputs.hf_repo }}
+          NAME: ${{ inputs.name }}
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo = os.environ["REPO"]
+          api.create_repo(repo, repo_type="dataset", exist_ok=True)
+          api.upload_folder(repo_id=repo, repo_type="dataset", folder_path="out/hips", path_in_repo=f"hips/{os.environ['NAME']}",
+                            commit_message=f"Mosaic {os.environ['NAME']}")
+          api.upload_file(repo_id=repo, repo_type="dataset", path_or_fileobj="out/mosaic.json",
+                          path_in_repo=f"hips/{os.environ['NAME']}/mosaic.json")
+          EOF

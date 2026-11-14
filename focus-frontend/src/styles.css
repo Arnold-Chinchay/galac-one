@@ -181,3 +181,29 @@ dt{font-size:12px}dd{font-size:14px}
 .hero-bottom>div>span{font-size:12px}
 @media(max-width:1150px){.target-kind{font-size:9px}.target-card p{font-size:12px}.pending-dot{font-size:10px}.cadence{font-size:12px}}
 @media(max-width:700px){.segmented button{font-size:12px;padding:8px 10px}.workspace-heading .eyebrow{font-size:10px}.target-card p{font-size:12px}}
+.sky-home{position:relative;height:calc(100vh - 72px);min-height:520px;background:#03050a}
+.sky-home .skymap{margin:0;height:100%}
+.sky-home .skymap-canvas{border:0;border-radius:0;height:100%}
+.skymap{position:relative}
+.skymap-reset{position:absolute;left:16px;bottom:16px;z-index:5;background:rgba(5,8,15,.85);color:#ffd38a;border:1px solid rgba(255,211,138,.4);border-radius:999px;padding:8px 16px;font:600 14px system-ui;cursor:pointer}
+.sky-home .skymap-reset{left:auto;right:400px}
+.sky-panel{position:absolute;top:16px;right:16px;bottom:16px;width:360px;overflow:auto;z-index:6;background:rgba(6,10,20,.88);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:14px}
+.sky-panel h1{font-size:30px;line-height:1.15;margin:0}
+.sky-panel h1 em{color:#f5a524;font-style:normal}
+.sky-panel h2{font-size:26px;margin:0}
+.sky-panel p{margin:0;color:#c6cfdd;font-size:15px;line-height:1.5}
+.field-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.field-list button{width:100%;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px 12px;color:#fff;font-size:15px;cursor:pointer;text-align:left}
+.field-list button:hover{border-color:#f5a524}
+.field-list span{flex:1;font-weight:600}
+.field-list small{color:#8d98ab;font-size:13px}
+.sky-stats{font-size:13px!important;color:#8d98ab!important}
+.sky-panel .back{align-self:flex-start}
+.field-thumb{padding:0;border:1px solid rgba(255,255,255,.1);border-radius:12px;overflow:hidden;background:#000;cursor:zoom-in}
+.field-thumb img{display:block;width:100%;aspect-ratio:1}
+.finding{display:flex;flex-direction:column;gap:4px;border-left:3px solid #f5a524;padding:4px 0 4px 12px}
+.finding strong{font-size:24px;color:#ffd38a}
+.finding span{color:#c6cfdd;font-size:14px;line-height:1.45}
+.panel-actions{display:flex;gap:10px;flex-wrap:wrap}
+.back-to-sky{margin-bottom:6px}
+@media (max-width:760px){.sky-home{height:auto}.sky-home .skymap{height:60vh}.sky-panel{position:static;width:auto;border-radius:0}.sky-home .skymap-reset{right:auto}}

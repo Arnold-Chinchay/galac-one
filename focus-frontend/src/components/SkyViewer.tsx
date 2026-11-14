@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { PointerEvent } from 'react';
 import type { Frame, Tile, Candidate } from '../data/types';
 import type { Annotation } from '../lib/storage';
@@ -18,7 +18,7 @@ export default function SkyViewer(p:Props){
  const zoomRef=useRef(p.zoom);zoomRef.current=p.zoom;const onZoom=useRef(p.onZoom);onZoom.current=p.onZoom;
  const {manifest:m}=p.tile;
  const scale=size/m.width_px*p.zoom;const pan={x:p.pan.x*scale,y:p.pan.y*scale};const u=m.width_px/512/p.zoom;
- useEffect(()=>{if(!wrap.current)return;const ro=new ResizeObserver(entries=>{const r=entries[0].contentRect;setSize(Math.min(r.width,r.height*m.width_px/m.height_px))});ro.observe(wrap.current);return()=>ro.disconnect()},[m.width_px,m.height_px]);
+ useLayoutEffect(()=>{const el=wrap.current;if(!el)return;const fit=()=>{const w=el.clientWidth,h=el.clientHeight;if(w&&h)setSize(Math.min(w,h*m.width_px/m.height_px))};fit();const ro=new ResizeObserver(fit);ro.observe(el);window.addEventListener('resize',fit);return()=>{ro.disconnect();window.removeEventListener('resize',fit)}},[m.width_px,m.height_px]);
  // The wheel zooms the picture; a native listener is needed to stop the page from scrolling under it.
  useEffect(()=>{const el=wrap.current;if(!el)return;const wheel=(e:WheelEvent)=>{e.preventDefault();onZoom.current(Math.max(1,Math.min(MAX_ZOOM,+(zoomRef.current*(e.deltaY<0?1.2:1/1.2)).toFixed(2))))};el.addEventListener('wheel',wheel,{passive:false});return()=>el.removeEventListener('wheel',wheel)},[]);
  function down(e:PointerEvent){if(e.button!==0)return;drag.current={x:e.clientX,y:e.clientY,px:p.pan.x,py:p.pan.y,moved:false};e.currentTarget.setPointerCapture(e.pointerId)}

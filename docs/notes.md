@@ -50,6 +50,14 @@ Las estrellas brillantes saturan: hay que usar alas o halo. La astrometría de G
 - Hugging Face Docker Spaces ya no es gratis; Render free se duerme a los 15 min y tiene 0.1 CPU.
 - D1 `naylamp-db` (tablas en `migrations/`), R2 `naylamp-tiles`.
 
+## Web centrada en el mapa y mosaico continuo (en curso, 14-nov noche)
+- La web tiene 3 secciones: **Sky** (mapa de todo el cielo a pantalla completa, clic = acercar hacia ese punto, tope 0.2°, botón "Whole sky"; panel con los 5 campos, una cifra por campo y "Look closer" / "Classify this field"), **Classify** y **About & data**. La vista de un campo (`/explore`) solo tiene "Sharp image", "Watch it move", "What changed" y "What we measured here".
+- Las 5 imágenes profundas drizzle se dibujan dentro del mapa en su posición real (`SkyMap` prop `deep`, `A.image` con el WCS de `deep.json`). Se ve como un parche: borde recto, falso color de IRSA frente a color real, y el HiPS de IRSA en bloques cuando se acerca.
+- **Plan para que no sea un parche (idea de panorama):** dividir una región de varios grados en celdas de 0.4° (matriz de GitHub Actions; cada celda = `fetch_tile --ra --dec --fov 0.45` + `deep --method drizzle --oversample 2`, ~12 min), unir las celdas en un mosaico con bordes difuminados, convertirlo en HiPS con `reproject_to_hips` (reproject 0.21 lee un PNG con WCS AVM incrustado vía `pyavm`; probado en Barnard: 0.8 s, órdenes 0-7, PNG transparentes) y servirlo desde un **dataset de Hugging Face** (CORS comprobado). En el mapa se agrega como capa HiPS encima de IRSA, con IRSA en gris para que no choque.
+- Almacenamiento: R2 (10 GB) para lo de cada visita; Hugging Face Datasets para el mosaico grande (público "best-effort", hasta ~5 TB); Zenodo (50 GB, DOI) para la publicación final. Google Drive no sirve (sin enlaces directos ni CORS). GitHub Releases no tiene CORS.
+- Falta del usuario: cuenta u organización en Hugging Face y un token de escritura guardado como secreto `HF_TOKEN` del repo (`gh secret set HF_TOKEN`).
+- Hecho y desplegado, sin commit todavía: portada nueva, `SkyMap` con clic-zoom y capas profundas, arreglo del visor de cuadros (ahora mide su caja con `useLayoutEffect`), menú de 3 secciones.
+
 ## Pendiente
 - Verificar el movimiento propio de WISE 0855 con CatWISE cuando IRSA TAP funcione; corregir su paralaje.
 - Medir completitud con más inyecciones y más campos; interfaz de front.
