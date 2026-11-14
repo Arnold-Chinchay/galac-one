@@ -117,3 +117,20 @@ Descarga: 297/297 cuadros (1 de cada 8), 0 fallos, 10 min. Alineado: 294. La res
 2. **Riesgo:** como la ganancia sale de las fuentes brillantes, una variable muy dominante podría ser absorbida. Con ~8 fuentes brillantes la mediana lo reduce, pero **hay que probarlo inyectando una variable sintética**.
 3. **El suelo restante es ~6-10 % del flujo** en estrellas brillantes (todavía ×2.6 y no ×50). En cielo débil esto no importa; cerca de estrellas brillantes sí.
 4. Sin resolver: **WISE 0855 sigue sin encontrarse** y R Draconis (la variable oficial) no se ha extraído todavía.
+
+## 10. ¿La ganancia por cuadro borra variables reales? Prueba de inyección sobre R Draconis
+Se inyectó en los datos **reales** una variable sinusoidal (periodo 150 d) y se midió la respuesta como la diferencia entre el ajuste con y sin la inyección.
+
+| Caso | Sin ganancia | Con ganancia |
+|---|---|---|
+| Variable aditiva en píxel débil, pico 1.0 MJy/sr | 97 % recuperado | 71 % recuperado |
+| Variable aditiva en píxel débil, pico 0.3 MJy/sr | 97 % | 72 % |
+| Estrella más brillante varía ±50 % | 78 % (señal/ruido natural 1.2) | 57 % (señal/ruido **257**) |
+| Estrella más brillante varía ±20 % | 65 % (señal/ruido **0.46**, invisible) | 62 % (señal/ruido **103**) |
+
+**Conclusiones:**
+1. **La ganancia no borra la variable**: recupera 57-71 % de la amplitud inyectada. Pero **subestima la amplitud un 30-40 %**, así que las amplitudes hay que calibrarlas con inyecciones (para eso sirve el método de inyección-recuperación del doc 10).
+2. **En la estrella más brillante hace posible lo imposible**: sin ganancia, su variación natural (17.6 MJy/sr rms, ~100 % de su flujo) tapa una variabilidad del 20 % (señal/ruido 0.46). Con ganancia, el residuo natural baja a 0.08 y esa variación se ve con señal/ruido > 100.
+3. **Esto sugiere que casi toda la variación de esa estrella era instrumental** (escala global por cuadro), no de la estrella. Falta confirmarlo con otro campo.
+4. **Métrica correcta en estrellas** (rms entre cuadros, solo píxeles de estrellas, después del ajuste con ganancia): 1-3 MJy/sr ×4.5, 3-8 MJy/sr ×4.6, > 8 MJy/sr ×2.1. El residuo queda en 12-14 % del flujo (27 % en las más brillantes). La métrica anterior (×2.6) subestimaba porque incluía píxeles de ruido.
+5. **Lo que no se probó:** una variable que domine el campo (el 100 % de los píxeles brillantes), y que la ganancia se comporte igual en otros campos.

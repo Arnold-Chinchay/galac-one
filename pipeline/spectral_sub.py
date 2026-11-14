@@ -127,6 +127,8 @@ def fit_with_gain(image: np.ndarray, lam: np.ndarray, groups: np.ndarray, n_oute
         g = np.exp(logg)
     res = fit_static(image / g[:, None, None], lam, **kw)
     res.gain = g.astype(np.float32)
+    res.resid = (res.resid * g[:, None, None]).astype(np.float32)   # back to each frame's own flux units
+    res.model = (res.model * g[:, None, None]).astype(np.float32)
     return res
 
 
