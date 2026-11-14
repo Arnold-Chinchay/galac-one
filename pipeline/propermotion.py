@@ -26,10 +26,10 @@ def gauss2d(xy, a, x0, y0, s, b):
     return a * np.exp(-((x - x0) ** 2 + (y - y0) ** 2) / (2 * s * s)) + b
 
 
-def centroid(img, x0, y0, r=3):
+def centroid(img, x0, y0, r=3, max_masked=0.2):
     xi, yi = int(round(x0)), int(round(y0))
     box = img[yi - r:yi + r + 1, xi - r:xi + r + 1]
-    if box.shape != (2 * r + 1, 2 * r + 1) or np.isnan(box).mean() > 0.2:
+    if box.shape != (2 * r + 1, 2 * r + 1) or np.isnan(box).mean() > max_masked or np.isfinite(box).sum() < 12:
         return None
     yy, xx = np.mgrid[yi - r:yi + r + 1, xi - r:xi + r + 1]
     ok = np.isfinite(box)
@@ -38,7 +38,7 @@ def centroid(img, x0, y0, r=3):
         p, cov = curve_fit(gauss2d, (xx[ok], yy[ok]), box[ok], p0=[np.nanmax(box) - b0, x0, y0, 1.0, b0], maxfev=4000)
     except Exception:
         return None
-    if not (0.4 < p[3] < 3 and p[0] > 0 and abs(p[1] - x0) < r and abs(p[2] - y0) < r):
+    if not (0.4 < p[3] < r and p[0] > 0 and abs(p[1] - x0) < r and abs(p[2] - y0) < r):
         return None
     err = np.sqrt(np.abs(np.diag(cov)))[1:3]
     return p[1], p[2], p[0], float(np.hypot(*err))
@@ -58,6 +58,8 @@ def main() -> None:
     ap.add_argument("--name", required=True)
     ap.add_argument("--target", required=True, choices=sorted(TARGETS))
     ap.add_argument("--parallax", type=float, default=0.0, help="mas, removed before the fit")
+    ap.add_argument("--box", type=int, default=3, help="half size of the fit box; larger for saturated stars")
+    ap.add_argument("--max-masked", type=float, default=0.2, help="allowed masked fraction in the box (saturated cores)")
     ap.add_argument("--min-lam", type=float, default=0.0, help="use only frames with wavelength above this (um)")
     a = ap.parse_args()
     tile = CACHE / "tiles" / a.name
@@ -72,7 +74,7 @@ def main() -> None:
             continue
         ra, dec = position_at(a.target, mjd[i])
         x0, y0 = w.world_to_pixel_values(float(ra), float(dec))
-        c = centroid(img[i], float(x0), float(y0))
+        c = centroid(img[i], float(x0), float(y0), a.box, a.max_masked)
         if c:
             rows.append((mjd[i], *c))
     if len(rows) < 10:

@@ -78,12 +78,13 @@ async function postVotes(env, request) {
     ...valid.map((v) =>
       env.DB.prepare("INSERT OR IGNORE INTO votes (user_id, candidate_id, label, ms) VALUES (?1, ?2, ?3, ?4)")
         .bind(userId, v.candidate_id, v.label, Number.isFinite(v.ms) ? Math.round(v.ms) : null)),
-    // reliability = Laplace-smoothed accuracy on hidden injections (truth lives only in the DB)
+    // reliability = accuracy on hidden injections (must be 'moving') and blank controls (must not be)
     env.DB.prepare(
       `UPDATE users SET
          n_votes   = (SELECT COUNT(*) FROM votes WHERE user_id = ?1),
-         n_graded  = (SELECT COUNT(*) FROM votes v JOIN candidates c ON c.id = v.candidate_id WHERE v.user_id = ?1 AND c.is_injection = 1),
-         n_correct = (SELECT COUNT(*) FROM votes v JOIN candidates c ON c.id = v.candidate_id WHERE v.user_id = ?1 AND c.is_injection = 1 AND v.label = 'moving')
+         n_graded  = (SELECT COUNT(*) FROM votes v JOIN candidates c ON c.id = v.candidate_id WHERE v.user_id = ?1 AND c.is_injection IN (1, 2)),
+         n_correct = (SELECT COUNT(*) FROM votes v JOIN candidates c ON c.id = v.candidate_id WHERE v.user_id = ?1 AND
+                      ((c.is_injection = 1 AND v.label = 'moving') OR (c.is_injection = 2 AND v.label IN ('artifact', 'unsure'))))
        WHERE id = ?1`).bind(userId),
     env.DB.prepare("UPDATE users SET reliability = (n_correct + 1.0) / (n_graded + 2.0) WHERE id = ?1").bind(userId),
     env.DB.prepare("SELECT n_votes, reliability FROM users WHERE id = ?1").bind(userId),

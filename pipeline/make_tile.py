@@ -68,6 +68,7 @@ def main() -> None:
     ap.add_argument("--name", required=True)
     ap.add_argument("--label", default="")
     ap.add_argument("--n-inject", type=int, default=6)
+    ap.add_argument("--n-blank", type=int, default=4, help="negative controls: tracks over empty sky, nothing injected")
     ap.add_argument("--seed", type=int, default=1)
     a = ap.parse_args()
     tile = CACHE / "tiles" / a.name
@@ -124,6 +125,16 @@ def main() -> None:
         cands.append({"id": cid, "x": mid[1], "y": mid[2], "frame": mid[0], "kind_hint": None, "score": None, "track": track})
         sql_c.append((cid, {"x": mid[1], "y": mid[2], "frame": mid[0], "snr": float(s["snr"]), "track": track}, 1))
         sql_i.append((cid, s))
+    brng = np.random.default_rng(a.seed + 1000)
+    for k, s in enumerate(make_injections(brng, a.n_blank, mjd, image.shape, res.sigma)):
+        cid = opaque_id(a.name, a.seed, f"b{k}")
+        fr = [f for f in s["frames"] if brng.random() < 0.8]
+        track = [[int(f), int(round(s["x"][f])), int(round(s["y"][f]))] for f in fr]
+        if len(track) < 4:
+            continue
+        mid = track[len(track) // 2]
+        cands.append({"id": cid, "x": mid[1], "y": mid[2], "frame": mid[0], "kind_hint": None, "score": None, "track": track})
+        sql_c.append((cid, {"x": mid[1], "y": mid[2], "frame": mid[0], "snr": 0.0, "track": track}, 2))
     rng.shuffle(cands)
 
     out = tile / "export"

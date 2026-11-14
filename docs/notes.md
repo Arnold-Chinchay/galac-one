@@ -18,9 +18,23 @@ Para cada píxel se ajusta un espectro estático (base lineal por tramos en log 
 - **Resultado en estrellas** (rms entre cuadros, solo píxeles de estrellas): ×4.5 de 1 a 8 MJy/sr, ×2.1 sobre 8 MJy/sr; el residuo queda en 12-14 % del flujo (27 % en las más brillantes). Sintético: ×55. La suma en 3×3 (`--box 3`) no ayudó.
 - **[sin probar]** Una variable que domine todo el campo podría ser absorbida por la ganancia. El origen físico de la ganancia (calibración, apuntado o variabilidad) no está claro: no sigue limpiamente DR1 contra QR3.
 
+## Resultados con los objetivos oficiales
+Datos leídos directo desde S3 en GitHub Actions (`build-tile`, ~2 min por campo; desde IRSA eran ~40 min). `s3cutout.py` es idéntico píxel a píxel al cutout de IRSA (FLAGS viene comprimida con RICE por filas).
+| Objetivo | Resultado solo con SPHEREx | Referencia |
+|---|---|---|
+| Barnard (saturada; centroide en las alas, `--box 6`) | 10.10 ± 0.12 ″/año | Gaia 10.39 (−2.9 %, dirección 0.3°) |
+| Epsilon Indi B (> 2.4 µm) | 4.70 ± 0.06 ″/año | Gaia 4.68 (+0.4 %, dirección 0.6°) |
+| R Draconis (saturada 6 px; halo 7-10 px) | periodo 238 d, ~1.1 mag, 260 cuadros | ~245 d en GCVS **[sin verificar: CDS caído]** |
+| RW Aurigae (anillo 2-5 px) | ~1 mag de variación, 316 cuadros; sin periodo claro | T Tauri, irregular |
+| WISE 0855 | **no encontrada**: en su posición hay una estrella azul (más brillante en λ cortas) | — |
+
+Las estrellas brillantes saturan: hay que usar alas o halo. La astrometría de Gaia está en `pipeline/targets.py` (WISE 0855 no está en Gaia; su movimiento propio es aproximado).
+
 ## Detección y mosaicos (`detect.py`, `make_tile.py`)
 - Picos del filtro 3×3 sobre el z-score (umbral 6, se ignoran píxeles con σ > 2× la mediana). Móviles: líneas rectas ajustadas por mínimos cuadrados (≥ 5 cuadros). Estáticos: grupos en el mismo píxel (≥ 4 cuadros, máx. 15).
-- `make_tile` inyecta objetos móviles sintéticos antes del ajuste. En R Draconis recuperó **6 de 6** (solo un campo y 6 objetos: no es una curva de completitud).
+- `make_tile` inyecta 6 móviles sintéticos y agrega 4 **controles en cielo vacío** (sin nada inyectado). Recuperó 27 de 30 inyecciones en los 5 campos.
+- **Completitud** (`completeness.py`, R Draconis, 48 inyecciones): 43 % a S/N 5-7 por cuadro, 82-90 % por encima de 7. Hay ~7 móviles falsos por campo.
+- **Confiabilidad del usuario** = aciertos en inyecciones (`moving`) y en controles (no `moving`), suavizada (+1/+2). Probado en vivo: quien marca todo `moving` saca 0.58; quien acierta, 0.92.
 - **No filtrar la verdad de las inyecciones:** sin `score` ni `kind_hint`, ids aleatorios, lista ordenada por id, trayectorias con posiciones enteras como las del detector. El SQL con la verdad (`tools/real_*.sql`) está en `.gitignore` y nunca se sube.
 - Publicar un mosaico: `python -m pipeline.make_tile --name X`, subir los 5 archivos de `cache/tiles/X/export/` a `naylamp-tiles/tiles/X/` con `npx wrangler r2 object put … --remote`, y `npx wrangler d1 execute naylamp-db --remote --yes --file tools/real_X_seed.sql`.
 
@@ -31,5 +45,4 @@ Para cada píxel se ajusta un espectro estático (base lineal por tramos en log 
 
 ## Pendiente
 - WISE 0855 sin encontrar (campo casi vacío; probar buscar una fuente muy roja, D6/D1 alto, cerca de la posición con movimiento propio **[sin verificar]**).
-- Mosaicos de Barnard, Epsilon Indi y RW Aur; curva de luz de R Draconis.
 - Medir completitud con más inyecciones y más campos; interfaz de front.

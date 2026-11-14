@@ -14,7 +14,8 @@ Diseño simple, celular primero, en inglés.
 
 ## Mosaicos
 - `mock`: cielo falso con respuestas conocidas (`/mock-tile/`). Aquí `kind_hint` y `score` tienen valores.
-- `rdra`: R Draconis real (`/tiles/rdra/`), 289 cuadros de 40×40 px y 27 candidatos. Aquí `kind_hint` y `score` son `null` a propósito.
+- Reales (`/tiles/<id>/`): `rdra` (R Draconis), `barnard`, `epsindib` (Epsilon Indi B), `rwaur` (RW Aurigae), `wise0855`. Entre 250 y 438 cuadros de 40×40 px y 11 a 37 candidatos. Aquí `kind_hint` y `score` son `null` a propósito.
+- Archivos extra en algunos mosaicos: `lightcurve.json` (`rdra`, `rwaur`: `points` = `[mjd, brillo relativo, detector]`, `period`) y `propermotion.json` (`barnard`, `epsindib`: `pm_mas_yr`, `err_mas_yr`, `reference_mas_yr` de Gaia, `points` = `[mjd, dRA mas, dDec mas]`). Son buenos para un gráfico sencillo.
 
 ## API
 | Ruta | Devuelve |
@@ -39,7 +40,7 @@ await fetch(`${API}/api/votes`, {
 // { ok, accepted, ignored, n_votes, reliability }
 ```
 - `label`: `moving`, `variable`, `artifact` o `unsure`. Un usuario no vota dos veces el mismo candidato.
-- `reliability` es la precisión contra objetos de prueba ocultos. **El servidor nunca dice cuáles son de prueba: no mostrar "acertaste/fallaste" por voto**, solo el número agregado.
+- `reliability` es la precisión contra objetos de prueba ocultos (deben marcarse `moving`) y controles en cielo vacío (no deben marcarse `moving`). **El servidor nunca dice cuáles son de prueba: no mostrar "acertaste/fallaste" por voto**, solo el número agregado.
 - Límites gratuitos: 100 000 peticiones/día y 100 000 escrituras/día. Votos en lotes, sin polling; si falla un envío, guardar en `localStorage` y reintentar.
 
 ## Formato de un mosaico (`files_url`)
