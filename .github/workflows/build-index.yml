@@ -1,15 +1,21 @@
 name: build-index
 
-# Builds our own spatial index of every SPHEREx Level-2 image by reading only the FITS headers
+# Builds/updates our spatial index of SPHEREx Level-2 images by reading only the FITS headers
 # (range reads, ~31 KB/file) from the public AWS bucket nasa-irsa-spherex. See pipeline/s3index.py.
-# Result: a public GitHub Release "index-<release>" with <release>_index.csv.gz.
+# Result: GitHub Release "index-<release>" holding <release>_index.csv.gz.
+#
+# INCREMENTAL: it downloads the previous index, indexes only weeks that are not in it yet
+# (plus the 2 newest weeks already in it, which may have been partial), and merges.
+# SCHEDULED: every Monday it refreshes QR3, the release that keeps growing weekly.
 
 on:
+  schedule:
+    - cron: "0 12 * * 1"          # Mondays 12:00 UTC (07:00 Peru) -> release qr3
   workflow_dispatch:
     inputs:
       release:
         description: "Data release prefix in the bucket (dr1, qr3)"
-        default: "dr1"
+        default: "qr3"
       weeks_per_job:
         description: "Weeks per parallel job"
         default: "5"
@@ -17,29 +23,51 @@ on:
 permissions:
   contents: write
 
+env:
+  REL: ${{ inputs.release || 'qr3' }}
+  GH_TOKEN: ${{ github.token }}
+
 jobs:
   plan:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.m.outputs.matrix }}
+      has_work: ${{ steps.m.outputs.has_work }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
       - run: pip install boto3 astropy --quiet
+      - name: Download previous index (if any)
+        run: |
+          mkdir -p prev
+          gh release download "index-$REL" -p "${REL}_index.csv.gz" -D prev 2>/dev/null || echo "no previous index"
+          ls -la prev
       - id: m
+        env:
+          N: ${{ inputs.weeks_per_job || '5' }}
         run: |
           python - <<'EOF' >> "$GITHUB_OUTPUT"
-          import json
+          import csv, glob, gzip, json, os
           from pipeline.s3index import list_weeks
-          weeks = list_weeks("${{ inputs.release }}")
-          n = int("${{ inputs.weeks_per_job }}")
-          chunks = [" ".join(weeks[i:i + n]) for i in range(0, len(weeks), n)]
-          print("matrix=" + json.dumps({"weeks": chunks}))
+          rel, n = os.environ["REL"], int(os.environ["N"])
+          present = set()
+          for f in glob.glob("prev/*.csv.gz"):
+              with gzip.open(f, "rt", newline="") as fh:
+                  r = csv.reader(fh); h = next(r); ki = h.index("key")
+                  present |= {row[ki].split("/")[2] for row in r}
+          allw = list_weeks(rel)
+          redo = set(sorted(present)[-2:])           # newest weeks may have been partial
+          todo = [w for w in allw if w not in present or w in redo]
+          chunks = [" ".join(todo[i:i + n]) for i in range(0, len(todo), n)]
+          print("has_work=" + ("true" if chunks else "false"))
+          print("matrix=" + json.dumps({"weeks": chunks or [""]}))
+          import sys; print(f"{rel}: {len(allw)} weeks in bucket, {len(present)} already indexed, {len(todo)} to do", file=sys.stderr)
           EOF
 
   index:
     needs: plan
+    if: needs.plan.outputs.has_work == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 300
     strategy:
@@ -51,49 +79,63 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
       - run: pip install boto3 astropy --quiet
-      - run: python -m pipeline.s3index --release ${{ inputs.release }} --weeks ${{ matrix.weeks }} --workers 64
+      - name: Remove stale per-week files so redone weeks are rebuilt
+        run: rm -rf cache/index
+      - run: python -m pipeline.s3index --release $REL --weeks ${{ matrix.weeks }} --workers 64
       - id: name
         run: echo "n=$(echo '${{ matrix.weeks }}' | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: index-${{ inputs.release }}-${{ steps.name.outputs.n }}
-          path: cache/index/${{ inputs.release }}/*.csv.gz
+          name: index-${{ inputs.release || 'qr3' }}-${{ steps.name.outputs.n }}
+          path: cache/index/${{ inputs.release || 'qr3' }}/*.csv.gz
           retention-days: 7
 
   merge:
-    needs: index
-    if: always()
+    needs: [plan, index]
+    if: always() && needs.plan.outputs.has_work == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Download previous index (if any)
+        run: |
+          mkdir -p prev
+          gh release download "index-$REL" -p "${REL}_index.csv.gz" -D prev 2>/dev/null || echo "no previous index"
       - uses: actions/download-artifact@v4
         with:
-          pattern: index-${{ inputs.release }}-*
+          pattern: index-${{ inputs.release || 'qr3' }}-*
           path: parts
           merge-multiple: true
-      - name: Merge weekly files
+      - name: Merge previous index with new weeks
         run: |
           python - <<'EOF'
-          import csv, glob, gzip
-          files = sorted(glob.glob("parts/*.csv.gz"))
-          n = 0
-          with gzip.open("${{ inputs.release }}_index.csv.gz", "wt", newline="") as out:
-              w = None
-              for f in files:
+          import csv, glob, gzip, os
+          rel = os.environ["REL"]
+          new_files = sorted(glob.glob("parts/*.csv.gz"))
+          new_weeks = set()
+          rows_new, header = [], None
+          for f in new_files:
+              with gzip.open(f, "rt", newline="") as fh:
+                  r = csv.reader(fh); header = next(r)
+                  for row in r:
+                      rows_new.append(row); new_weeks.add(row[0].split("/")[2])
+          kept = 0
+          with gzip.open(f"{rel}_index.csv.gz", "wt", newline="") as out:
+              w = csv.writer(out)
+              w.writerow(header)
+              for f in glob.glob("prev/*.csv.gz"):
                   with gzip.open(f, "rt", newline="") as fh:
-                      r = csv.reader(fh)
-                      header = next(r)
-                      if w is None:
-                          w = csv.writer(out); w.writerow(header)
+                      r = csv.reader(fh); next(r)
                       for row in r:
-                          w.writerow(row); n += 1
-          print(f"merged {len(files)} weeks, {n} images")
-          open("summary.txt", "w").write(f"{len(files)} weeks, {n} images\n")
+                          if row[0].split("/")[2] not in new_weeks:
+                              w.writerow(row); kept += 1
+              w.writerows(rows_new)
+          total = kept + len(rows_new)
+          msg = f"{total} images ({kept} kept, {len(rows_new)} new from {len(new_weeks)} weeks)"
+          print(msg); open("summary.txt", "w").write(msg + "\n")
           EOF
       - name: Publish as release asset
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="index-${{ inputs.release }}"
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "SPHEREx ${{ inputs.release }} spatial index" --notes "Built from FITS headers in s3://nasa-irsa-spherex/${{ inputs.release }}/level2 by pipeline/s3index.py. $(cat summary.txt)"
-          gh release upload "$TAG" "${{ inputs.release }}_index.csv.gz" --clobber
+          TAG="index-$REL"
+          NOTES="Built from FITS headers in s3://nasa-irsa-spherex/$REL/level2 by pipeline/s3index.py. $(cat summary.txt). Updated $(date -u +%F)."
+          gh release view "$TAG" >/dev/null 2>&1 && gh release edit "$TAG" --notes "$NOTES" || gh release create "$TAG" --title "SPHEREx $REL spatial index" --notes "$NOTES"
+          gh release upload "$TAG" "${REL}_index.csv.gz" --clobber
