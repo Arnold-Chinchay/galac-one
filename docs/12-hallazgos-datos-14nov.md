@@ -103,3 +103,17 @@ Descarga: 297/297 cuadros (1 de cada 8), 0 fallos, 10 min. Alineado: 294. La res
 1. Ajustar el modelo sobre el **flujo sumado en 3×3 píxeles** (insensible a la fase de subpíxel).
 2. Alinear con un remuestreo que conserve mejor el flujo, o no remuestrear y comparar en el plano de cada detector.
 3. Marcar como "no fiables" los píxeles con residuo muy mayor que el ruido, y descartar ahí los candidatos.
+
+## 9. Ganancia por cuadro (R Draconis): la causa principal del mal resultado
+**Prueba:** cuadros del **mismo detector y casi la misma λ** (diferencia < 0.02 µm) deberían dar el mismo flujo en las estrellas brillantes. No lo daban: **24 % de diferencia mediana**, creciendo con el tiempo entre cuadros (9 % a menos de 15 días, 27 % a 15-60 días, 46 % a más de 60). Entre DR1 y QR3, hasta ~100 %. La dispersión entre píxeles dentro de un mismo cuadro era solo ~12 %, así que el cambio es **una escala global por cuadro**, no ruido de PSF. La suma en 3×3 píxeles (`--box 3`) no cambió nada, lo que descarta la fase de subpíxel como causa principal.
+
+**Corrección:** `fit_with_gain` estima una ganancia por cuadro con las estrellas brillantes estáticas del campo y la ajusta junto con el espectro de cada píxel. La ganancia media de cada detector no se ajusta (la absorbe el espectro).
+- Cielo sintético con ganancias aleatorias de 0.6 a 1.6: reducción **×3.4 sin ganancia → ×53 con ganancia**, error de la ganancia 5.5 % dentro de cada detector.
+- R Draconis real: diferencia entre cuadros de igual λ **27 %/46 % → 9 %/10 %** y reducción en píxeles brillantes **×1.3 → ×2.6**. Recupera además 7 cuadros que se descartaban por error (282 → 289).
+- Ganancias ajustadas: p5-p95 = 0.51-1.55; los extremos (0.15 y 6.3) son cuadros rotos.
+
+**Lo que NO sabemos:**
+1. **No está probado el origen físico.** La ganancia no sigue la versión de datos (D1: QR3/DR1 = 2.1; D4: 0.86; D5: 0.83). Puede ser calibración, apuntado o variabilidad real de las estrellas más brillantes del campo.
+2. **Riesgo:** como la ganancia sale de las fuentes brillantes, una variable muy dominante podría ser absorbida. Con ~8 fuentes brillantes la mediana lo reduce, pero **hay que probarlo inyectando una variable sintética**.
+3. **El suelo restante es ~6-10 % del flujo** en estrellas brillantes (todavía ×2.6 y no ×50). En cielo débil esto no importa; cerca de estrellas brillantes sí.
+4. Sin resolver: **WISE 0855 sigue sin encontrarse** y R Draconis (la variable oficial) no se ha extraído todavía.

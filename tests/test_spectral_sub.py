@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from pipeline.spectral_sub import diagnostics, fit_static  # noqa: E402
+from pipeline.spectral_sub import diagnostics, fit_static, fit_with_gain  # noqa: E402
 
 
 def make_sky(seed=0, N=300, H=32, W=32):
@@ -76,6 +76,22 @@ def main() -> int:
     # the mover must not have been absorbed into the model: model near it stays smooth/static
     i, y, x = truth[len(truth) // 2]
     check("mover not absorbed by the fit (clipped out of the model)", not res.used[i, y, x])
+    # frames with different overall scales (as seen in real data) must not break the fit
+    rng = np.random.default_rng(3)
+    gains = rng.uniform(0.6, 1.6, len(img))
+    img_g = img * gains[:, None, None]
+    plain = diagnostics(fit_static(img_g, lam), img_g)["bright_pixels_rms_reduction_x"]
+    groups = np.digitize(np.nanmean(lam, axis=(1, 2)), [1.1, 1.63, 2.42, 3.82, 4.42])
+    resg = fit_with_gain(img_g, lam, groups)
+    dg = diagnostics(resg, img_g / resg.gain[:, None, None])["bright_pixels_rms_reduction_x"]
+    logrel = np.log(resg.gain / gains)
+    for d in np.unique(groups):
+        logrel[groups == d] -= np.median(logrel[groups == d])
+    scatter = float(np.std(logrel))
+    print(f"gain test: reduction {plain:.1f}x without gain -> {dg:.1f}x with gain; gain error within detectors {scatter:.3f}")
+    check("per-frame gains recovered within each detector (error < 8%, spread was 30%)", scatter < 0.08)
+    check("gain fit restores the static-structure removal (> 5x)", dg > 5)
+
     print("ALL PASS" if ok else "SOME FAILED")
     return 0 if ok else 1
 

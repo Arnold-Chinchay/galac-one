@@ -20,6 +20,7 @@ class SubResult:
     sigma: np.ndarray
     used: np.ndarray
     frame_scale: np.ndarray | None = None
+    gain: np.ndarray | None = None
 
 
 def hat_basis(lam: np.ndarray, nodes: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -99,6 +100,47 @@ def diagnostics(res: SubResult, image: np.ndarray) -> dict:
     }
 
 
+def fit_with_gain(image: np.ndarray, lam: np.ndarray, groups: np.ndarray, n_outer: int = 4,
+                  min_snr: float = 20.0, **kw) -> SubResult:
+    """fit_static plus a per-frame gain estimated from the bright static sources of the field.
+
+    groups labels each frame's detector. The mean gain of a detector is not fitted because the pixel
+    spectra absorb it; only changes between frames of the same detector are corrected.
+    """
+    N = len(image)
+    g = np.ones(N)
+    res = fit_static(image, lam, **kw)
+    for _ in range(n_outer):
+        corrected = image / g[:, None, None]
+        res = fit_static(corrected, lam, **kw)
+        floor = np.nanmedian(res.sigma) * np.median(res.frame_scale)
+        pix = np.nanmedian(res.model, axis=0) > min_snr * floor
+        if pix.sum() < 5:
+            break
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ratio = np.nanmedian((corrected / res.model)[:, pix], axis=1)
+        step = np.where(np.isfinite(ratio) & (ratio > 0), ratio, 1.0)
+        logg = np.log(g * step)
+        for d in np.unique(groups):
+            m = groups == d
+            logg[m] -= np.median(logg[m])
+        g = np.exp(logg)
+    res = fit_static(image / g[:, None, None], lam, **kw)
+    res.gain = g.astype(np.float32)
+    return res
+
+
+def box_sum(image: np.ndarray, size: int = 3, min_frac: float = 0.75) -> np.ndarray:
+    """Sum over a size x size box per frame, so the fit does not depend on the star's sub-pixel phase."""
+    from scipy.ndimage import uniform_filter
+    valid = np.isfinite(image)
+    n = size * size
+    s = uniform_filter(np.where(valid, image, 0.0), size=(1, size, size), mode="constant") * n
+    c = uniform_filter(valid.astype(float), size=(1, size, size), mode="constant") * n
+    out = np.where(c >= min_frac * n, s * (n / np.maximum(c, 1)), np.nan)
+    return out.astype(np.float32)
+
+
 def bad_frame_mask(res: SubResult, det: np.ndarray, thresh: float = 0.15, max_rel_scale: float = 3.0) -> np.ndarray:
     """Frames much noisier than the median of their own detector, or mostly far from the model."""
     frac = np.array([np.nanmean(np.abs(res.z[i]) > 5) if np.isfinite(res.z[i]).any() else 1.0 for i in range(len(res.z))])
@@ -115,28 +157,39 @@ def main() -> None:
     ap.add_argument("--name", required=True)
     ap.add_argument("--nodes", type=int, default=24)
     ap.add_argument("--clip", type=float, default=4.0)
+    ap.add_argument("--no-gain", action="store_true", help="skip the per-frame gain correction")
+    ap.add_argument("--box", type=int, default=1, help="fit the sum over a box x box window (3 removes sub-pixel phase effects)")
     ap.add_argument("--bad-frame-frac", type=float, default=0.15,
                     help="drop frames with more than this fraction of pixels beyond 5 sigma, then refit")
     a = ap.parse_args()
     tile = CACHE / "tiles" / a.name
     z = np.load(tile / "aligned.npz")
     image, lam, mjd, det = z["image"], z["lam"], z["mjd"], z["det"]
+    if a.box > 1:
+        image = box_sum(image, a.box)
     n_in = len(image)
 
-    res = fit_static(image, lam, n_nodes=a.nodes, clip=a.clip)
+    def fit(img, lm, dt):
+        if a.no_gain:
+            return fit_static(img, lm, n_nodes=a.nodes, clip=a.clip), img
+        r = fit_with_gain(img, lm, dt, n_nodes=a.nodes, clip=a.clip)
+        return r, img / r.gain[:, None, None]
+
+    res, fitted = fit(image, lam, det)
     bad = bad_frame_mask(res, det, a.bad_frame_frac)
-    d0 = diagnostics(res, image)
+    d0 = diagnostics(res, fitted)
     if bad.any():
         print(f"  pass 1: {int(bad.sum())}/{n_in} broken frames dropped (det {sorted(set(det[bad].tolist()))}, "
               f"lam {np.nanmean(lam[bad], axis=(1, 2)).round(2).tolist()}), refitting")
         keep = ~bad
         image, lam, mjd, det = image[keep], lam[keep], mjd[keep], det[keep]
-        res = fit_static(image, lam, n_nodes=a.nodes, clip=a.clip)
+        res, fitted = fit(image, lam, det)
     else:
         keep = np.ones(n_in, bool)
     np.savez_compressed(tile / "residuals.npz", resid=res.resid, z=res.z, sigma=res.sigma, model=res.model,
+                        gain=res.gain if res.gain is not None else np.ones(len(image), np.float32),
                         mjd=mjd, det=det, lam=np.nanmean(lam, axis=(1, 2)), kept_index=np.where(keep)[0])
-    d1 = diagnostics(res, image)
+    d1 = diagnostics(res, fitted)
     print(f"  {'metric':32s} {'pass 1':>10s} {'final':>10s}")
     for k in d1:
         print(f"  {k:32s} {d0[k]:10.4g} {d1[k]:10.4g}")
