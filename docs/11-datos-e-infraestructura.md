@@ -62,6 +62,8 @@ Nunca descargamos FITS completos (~70 MB × 6 detectores por exposición). Solo 
 | Descargas que aguanta el plan | 10 M lecturas/mes, ~3 lecturas por mosaico (manifest, frames, cubo) | ~3 M mosaicos/mes |
 | Votos en D1 | ~150 B por voto, 500 MB por base | ~3 M votos por base |
 
+> ⚠️ **Corrección (doc 12):** lo que **baja de IRSA** pesa **4 MB por recorte**, no 86 KB (la tabla EPSF ocupa 3.8 MB y no se puede excluir). Son ~600 MB de descarga por mosaico, que ocurre solo en GitHub Actions. Tras reducir, queda ~48 KB por cuadro, así que lo **almacenado** sí coincide con esta tabla.
+
 **Conclusión:** el almacenamiento y el tráfico sobran. Los límites que hay que cuidar son **las 100,000 peticiones/día del Worker** y **las 100,000 escrituras/día de D1**.
 
 ---
