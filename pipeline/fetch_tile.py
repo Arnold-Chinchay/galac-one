@@ -42,6 +42,7 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=4, help="parallel downloads (be polite to IRSA: <= 8)")
     ap.add_argument("--max-frames", type=int, default=0, help="0 = all")
     ap.add_argument("--frames-json", help='fallback list: [{"uri": "...", "mjd": 0}] when TAP is down')
+    ap.add_argument("--stride", type=int, default=1, help="take every Nth frame (sorted by time)")
     ap.add_argument("--keep-raw", action="store_true")
     ap.add_argument("--source", choices=["auto", "tap", "index"], default="auto",
                     help="auto = IRSA TAP if it is up, else our S3 index (pipeline/s3index.py)")
@@ -60,6 +61,9 @@ def main() -> None:
         idx = load_merged(a.index) if a.index else load_index(a.release)
         frames = frames_at(a.ra, a.dec, idx, margin_deg=a.fov / 2)
         print(f"frames from our S3 index ({len(idx['key'])} images indexed): {len(frames)}")
+    if a.stride > 1:
+        frames = frames[:: a.stride]          # even sampling in time (crowded fields have thousands of frames)
+        print(f"stride {a.stride}: using {len(frames)} frames")
     if a.max_frames:
         frames = frames[: a.max_frames]
 

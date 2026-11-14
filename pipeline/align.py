@@ -50,7 +50,7 @@ def frame_wcs(meta: dict) -> WCS:
     return WCS(fits.Header.fromstring(meta["wcs"], sep="\n"))
 
 
-def align_frame(npz, wcs_in: WCS, wcs_out: WCS, shape_out: tuple[int, int]) -> dict:
+def align_frame(npz, wcs_in: WCS, wcs_out: WCS, shape_out: tuple[int, int], bg_sub: bool = True) -> dict:
     def rp(arr, order):
         out, fp = reproject_interp((arr, wcs_in), wcs_out, shape_out=shape_out, order=order)
         return out, fp
@@ -67,9 +67,13 @@ def align_frame(npz, wcs_in: WCS, wcs_out: WCS, shape_out: tuple[int, int]) -> d
     grown = bad.copy()
     grown[1:, :] |= bad[:-1, :]; grown[:-1, :] |= bad[1:, :]
     grown[:, 1:] |= bad[:, :-1]; grown[:, :-1] |= bad[:, 1:]
-    clean = np.where(grown, np.nan, img - zod).astype(np.float32)
+    clean = np.where(grown, np.nan, img - zod)
+    # per-frame background: the residual zodiacal light changes with time and wavelength and is spatially
+    # smooth, so it shows up as a frame-wide offset that a per-pixel spectrum cannot model.
+    bg = float(np.nanmedian(clean)) if bg_sub and np.isfinite(clean).any() else 0.0
+    clean = (clean - bg).astype(np.float32)
     return {"image": clean, "var": np.where(grown, np.nan, var).astype(np.float32),
-            "lam": lam.astype(np.float32), "flags": flags, "bad_frac": float(grown.mean())}
+            "lam": lam.astype(np.float32), "flags": flags, "bad_frac": float(grown.mean()), "bg": bg}
 
 
 def main() -> None:
@@ -77,6 +81,7 @@ def main() -> None:
     ap.add_argument("--name", required=True)
     ap.add_argument("--grid-fov", type=float, help="output grid size in deg (default: cutout fov / 1.45, always inside a rotated cutout)")
     ap.add_argument("--max-bad", type=float, default=0.5, help="drop frames with more than this fraction of masked pixels")
+    ap.add_argument("--no-bg-sub", action="store_true", help="do not subtract each frame's median background")
     a = ap.parse_args()
 
     tile = CACHE / "tiles" / a.name
@@ -88,17 +93,18 @@ def main() -> None:
     keep, cols = [], {k: [] for k in ("image", "var", "lam", "flags")}
     for m in sorted(info["frames"], key=lambda m: m["mjd"]):
         z = np.load(tile / m["file"])
-        r = align_frame(z, frame_wcs(m), wcs_out, shape)
+        r = align_frame(z, frame_wcs(m), wcs_out, shape, bg_sub=not a.no_bg_sub)
         if r["bad_frac"] > a.max_bad:
             continue
         for k in cols:
             cols[k].append(r[k])
-        keep.append({**m, "bad_frac": r["bad_frac"]})
+        keep.append({**m, "bad_frac": r["bad_frac"], "bg": r["bg"]})
 
     out = {k: np.stack(v) for k, v in cols.items()}
     np.savez_compressed(tile / "aligned.npz", **out,
                         mjd=np.array([m["mjd"] for m in keep]), det=np.array([m["detector"] for m in keep]),
                         bad_frac=np.array([m["bad_frac"] for m in keep], dtype=np.float32),
+                        bg=np.array([m["bg"] for m in keep], dtype=np.float32),
                         wcs=wcs_out.to_header().tostring(sep="\n"))
     print(f"kept {len(keep)}/{info['n_ok']} frames (bad fraction <= {a.max_bad}) -> {tile / 'aligned.npz'}")
     lam = np.array([m["lam_center"] for m in keep])

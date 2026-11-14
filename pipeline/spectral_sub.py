@@ -29,6 +29,7 @@ class SubResult:
     z: np.ndarray        # (N,H,W) resid / robust per-pixel scatter
     sigma: np.ndarray    # (H,W)   robust per-pixel scatter of the residuals
     used: np.ndarray     # (N,H,W) bool, frames that were kept in the fit (not clipped)
+    frame_scale: np.ndarray | None = None   # (N,) relative noise of each frame (noise = sigma[p] * frame_scale[i])
 
 
 def hat_basis(lam: np.ndarray, nodes: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -60,8 +61,9 @@ def fit_static(image: np.ndarray, lam: np.ndarray, n_nodes: int = 24, smooth: fl
     sigma = np.full((H, W), np.nan)
     model = np.zeros_like(y)
 
+    s_f = np.ones(N)                                       # per-frame noise scale (real data: noise varies a lot by frame)
     for it in range(n_iter):
-        w = keep.astype(np.float64)
+        w = keep / (s_f[:, None, None] ** 2)               # weighted least squares: noisy frames count less
         A = np.zeros((H, W, n_nodes, n_nodes))
         b = np.zeros((H, W, n_nodes))
         for i in range(N):                                 # banded accumulation, 2 nonzeros per frame
@@ -78,13 +80,18 @@ def fit_static(image: np.ndarray, lam: np.ndarray, n_nodes: int = 24, smooth: fl
         hh, ww = np.indices((H, W))
         model = (coef[hh[None], ww[None], k] * (1 - t) + coef[hh[None], ww[None], k + 1] * t)
         r = np.where(valid0, y - model, np.nan)
-        sigma = 1.4826 * np.nanmedian(np.abs(r - np.nanmedian(r, axis=0)), axis=0)
-        sigma = np.maximum(sigma, 1e-6)
-        keep = valid0 & (np.abs(r) < clip * sigma[None])
+        for _ in range(2):                                  # noise = sigma[pixel] * s_f[frame], estimated alternately
+            rn = r / s_f[:, None, None]
+            sigma = np.maximum(1.4826 * np.nanmedian(np.abs(rn - np.nanmedian(rn, axis=0)), axis=0), 1e-6)
+            s_f = 1.4826 * np.nanmedian(np.abs(r / sigma[None]), axis=(1, 2))
+            s_f = np.where(np.isfinite(s_f) & (s_f > 0), s_f, np.nanmedian(s_f))
+            s_f = s_f / np.nanmedian(s_f)
+        keep = valid0 & (np.abs(r) < clip * sigma[None] * s_f[:, None, None])
 
     resid = np.where(valid0, y - model, np.nan)
-    return SubResult(model=model.astype(np.float32), resid=resid.astype(np.float32),
-                     z=(resid / sigma[None]).astype(np.float32), sigma=sigma.astype(np.float32), used=keep)
+    z = resid / (sigma[None] * s_f[:, None, None])
+    return SubResult(model=model.astype(np.float32), resid=resid.astype(np.float32), z=z.astype(np.float32),
+                     sigma=sigma.astype(np.float32), used=keep, frame_scale=s_f.astype(np.float32))
 
 
 def diagnostics(res: SubResult, image: np.ndarray) -> dict:
@@ -103,20 +110,52 @@ def diagnostics(res: SubResult, image: np.ndarray) -> dict:
     }
 
 
+def bad_frame_mask(res: SubResult, det: np.ndarray, thresh: float = 0.15, max_rel_scale: float = 3.0) -> np.ndarray:
+    """True for broken frames: far noisier than the typical frame OF THE SAME DETECTOR (D6 is legitimately
+    ~3x noisier than D4) or with a large share of pixels far from the model. Weighting already stops them
+    from distorting the fit; dropping them stops them from producing false candidates."""
+    frac = np.array([np.nanmean(np.abs(res.z[i]) > 5) if np.isfinite(res.z[i]).any() else 1.0 for i in range(len(res.z))])
+    noisy = np.zeros(len(res.z), bool)
+    if res.frame_scale is not None:
+        for d in np.unique(det):
+            m = det == d
+            noisy[m] = res.frame_scale[m] > max_rel_scale * np.median(res.frame_scale[m])
+    return (frac > thresh) | noisy
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--name", required=True)
     ap.add_argument("--nodes", type=int, default=24)
     ap.add_argument("--clip", type=float, default=4.0)
+    ap.add_argument("--bad-frame-frac", type=float, default=0.15,
+                    help="drop frames with more than this fraction of pixels beyond 5 sigma, then refit")
     a = ap.parse_args()
     tile = CACHE / "tiles" / a.name
     z = np.load(tile / "aligned.npz")
-    res = fit_static(z["image"], z["lam"], n_nodes=a.nodes, clip=a.clip)
+    image, lam, mjd, det = z["image"], z["lam"], z["mjd"], z["det"]
+    n_in = len(image)
+
+    res = fit_static(image, lam, n_nodes=a.nodes, clip=a.clip)
+    bad = bad_frame_mask(res, det, a.bad_frame_frac)
+    d0 = diagnostics(res, image)
+    if bad.any():
+        print(f"  pass 1: {int(bad.sum())}/{n_in} broken frames dropped (det {sorted(set(det[bad].tolist()))}, "
+              f"lam {np.nanmean(lam[bad], axis=(1, 2)).round(2).tolist()}), refitting")
+        keep = ~bad
+        image, lam, mjd, det = image[keep], lam[keep], mjd[keep], det[keep]
+        res = fit_static(image, lam, n_nodes=a.nodes, clip=a.clip)
+    else:
+        keep = np.ones(n_in, bool)
     np.savez_compressed(tile / "residuals.npz", resid=res.resid, z=res.z, sigma=res.sigma, model=res.model,
-                        mjd=z["mjd"], det=z["det"], lam=z["lam"].mean(axis=(1, 2)))
-    for k, v in diagnostics(res, z["image"]).items():
-        print(f"  {k:32s} {v:.4g}")
-    print("->", tile / "residuals.npz")
+                        mjd=mjd, det=det, lam=np.nanmean(lam, axis=(1, 2)), kept_index=np.where(keep)[0])
+    d1 = diagnostics(res, image)
+    print(f"  {'metric':32s} {'pass 1':>10s} {'final':>10s}")
+    for k in d1:
+        print(f"  {k:32s} {d0[k]:10.4g} {d1[k]:10.4g}")
+    print("  tail fraction |z|>5 by detector (final):",
+          {f"D{d}": round(float((np.abs(res.z[det == d][np.isfinite(res.z[det == d])]) > 5).mean()), 4) for d in sorted(set(det.tolist()))})
+    print("->", tile / "residuals.npz", f"({len(image)}/{n_in} frames kept)")
 
 
 if __name__ == "__main__":
