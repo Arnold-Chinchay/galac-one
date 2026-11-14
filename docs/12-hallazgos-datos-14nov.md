@@ -13,6 +13,19 @@
   4. Si sigue caído mucho tiempo, escribir al **IRSA Helpdesk**.
 - **Abierto:** la tabla de 3I/ATLAS (259 filas) trae `access_url` de datalink, que también está caído. Hay que ver si se puede construir la URL del recorte QR2 a partir de `obs_id` (la versión del archivo, `l2b-vXX-...`, no la conocemos) **[verificar]**.
 
+## 1b. ✅ Solución: SPHEREx está completo en AWS S3, y armamos **nuestro propio índice**
+- **Comprobado que no eran links viejos:** el código **exacto** del tutorial oficial (`Irsa.query_sia(..., collection=['spherex_dr1','spherex_qr3'])`, actualizado el 5-mar-2026) también falla con 502 en `SIA/capabilities`. Es una caída del lado de IRSA.
+- **AWS Open Data:** bucket público **`s3://nasa-irsa-spherex`** (región `us-east-1`, acceso **anónimo**, sin cuenta AWS). Prefijos `dr1/`, `qr3/`, `qr2/`. Dentro de `dr1/`: `level2/` (imágenes), `hips5_cube/` (cubo del cielo completo), `spectral_wcs/`, calibraciones, etc.
+- **Estructura:** `dr1/level2/<semana>/l2b-v27-2026-196/<detector>/level2_<obsid>D<det>_spx_l2b-v27-2026-196.fits`. Hay **110 semanas**, ~9,400 archivos y ~613 GB por semana, unos **~1 millón de imágenes** en DR1. Cada archivo pesa ~65 MB. También hay carpetas `l2b_retry-...` (reprocesos).
+- **La clave del bucket es la misma ruta que usa IRSA:** `https://irsa.ipac.caltech.edu/ibe/data/spherex/` + clave S3. El Cutout Service funciona con esas URLs.
+- **No hay índice espacial en el bucket.** Por eso escribimos `pipeline/s3index.py`: lee **solo los primeros 31 KB** de cada FITS con una petición de rango HTTP (0.22 s). Ahí está el header de `IMAGE` con WCS, tiempo y detector. De eso calcula la huella (4 esquinas) de cada imagen.
+  - Probado: 1 semana = 9,416 imágenes en 176 s desde una laptop; el CSV comprimido pesa 533 KB.
+  - **Validado:** para la posición del tutorial oficial, nuestra primera imagen coincide **exactamente** con la que devuelve el tutorial (`level2_2025W18_1B_0074_2D1`).
+  - `pipeline/frames_index.py` responde "qué imágenes cubren (RA, Dec)" con prueba exacta de punto en polígono.
+  - `fetch_tile.py --source auto` usa TAP si está vivo y, si no, nuestro índice.
+- **Índice completo de DR1:** lo construye el workflow `.github/workflows/build-index.yml` (22 trabajos en paralelo) y lo publica como **GitHub Release `index-dr1`** (`dr1_index.csv.gz`, ~60 MB estimados). Para usarlo: descargarlo y pasar `--index dr1_index.csv.gz`.
+- **Bonus:** esto también hace posible "pedir un campo nuevo" sin depender de IRSA, y repetirlo para QR3 (`-f release=qr3`).
+
 ## 2. Cada recorte pesa 4 MB (no 86 KB)
 Probado con `?center=337.8783221,-5.1891588deg&size=0.1deg`:
 | Dato | Valor |
