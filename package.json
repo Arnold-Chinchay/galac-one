@@ -1,0 +1,27 @@
+{
+  "name": "hackaton-nasa-2026",
+  "version": "1.0.0",
+  "description": "A public web tool that finds moving and variable objects in SPHEREx sky images using spectral subtraction, and turns volunteers into a calibrated detector.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/spacenaylamp-blip/naylam_space.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/spacenaylamp-blip/naylam_space/issues"
+  },
+  "homepage": "https://github.com/spacenaylamp-blip/naylam_space#readme",
+  "devDependencies": {
+    "wrangler": "^4.162.0"
+  }
+}

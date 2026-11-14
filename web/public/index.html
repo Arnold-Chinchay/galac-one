@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Naylamp Space · SPHEREx</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 42rem; margin: 2rem auto; padding: 0 1rem; color: #111; background: #fff; }
+    h1 { margin-bottom: .25rem; }
+    .muted { color: #555; }
+    pre { background: #f3f3f3; padding: .75rem; border-radius: 6px; overflow: auto; }
+    footer { margin-top: 2rem; font-size: .8rem; color: #555; }
+    @media (prefers-color-scheme: dark) { body { background: #111; color: #eee; } pre { background: #222; } .muted, footer { color: #aaa; } }
+  </style>
+</head>
+<body>
+  <h1>Naylamp Space</h1>
+  <p class="muted">Crowd-calibrated search for moving and changing objects in SPHEREx data.</p>
+
+  <h2>Status</h2>
+  <pre id="status">checking backend…</pre>
+
+  <h2>Tiles</h2>
+  <pre id="tiles">loading…</pre>
+
+  <footer>
+    This publication makes use of data products from the Spectro-Photometer for the History of the Universe, Epoch of Reionization and Ices Explorer (SPHEREx), which is a joint project of the Jet Propulsion Laboratory and the California Institute of Technology, and is funded by the National Aeronautics and Space Administration.
+  </footer>
+
+  <script>
+    const show = (id, v) => (document.getElementById(id).textContent = typeof v === "string" ? v : JSON.stringify(v, null, 2));
+    fetch("/api/health").then(r => r.json()).then(v => show("status", v)).catch(e => show("status", "error: " + e));
+    fetch("/api/tiles").then(r => r.json()).then(v => show("tiles", v.tiles.length ? v.tiles : "no tiles yet")).catch(e => show("tiles", "error: " + e));
+  </script>
+</body>
+</html>

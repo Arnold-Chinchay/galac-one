@@ -1,0 +1,17 @@
+name = "naylamp-space"
+main = "api/src/index.js"
+compatibility_date = "2026-11-01"
+
+# Static web (web/public) is served by the same Worker; /api/* and /tiles/* are handled in code.
+[assets]
+directory = "./web/public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "naylamp-db"
+database_id = "0ec22d5f-a25e-41c5-ab41-d7fc5461fb11"
+
+[[r2_buckets]]
+binding = "TILES"
+bucket_name = "naylamp-tiles"
