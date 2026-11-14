@@ -1,0 +1,11 @@
+﻿__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+node_modules/
+.wrangler/
+*.fits
+cache/
+out/
+.dev.vars
