@@ -89,10 +89,12 @@ def join(cell_dirs: list[Path], ra: float, dec: float, size: float, out: Path) -
         chans.append(np.clip(x, 0, 1))
     rgb = np.stack(chans, axis=-1)
     # Alpha fades the outer edge of the region into the all-sky map instead of cutting it.
-    edge = np.clip(cover / (np.nanmax(cover) or 1), 0, 1)
-    yy, xx = np.mgrid[0:n, 0:n]
-    border = np.minimum.reduce([xx, yy, n - 1 - xx, n - 1 - yy]) / (0.06 * n)
-    alpha = np.clip(np.minimum(edge * 4, border), 0, 1)
+    # Opaque wherever any cell has data (overlap weights are low where cells meet, so they cannot be the alpha).
+    from scipy.ndimage import distance_transform_edt
+    covered = (cover > 0) & np.all([np.isfinite(mosaic[b]) for b in BANDS], axis=0)
+    covered[[0, -1], :] = covered[:, [0, -1]] = False
+    alpha = np.clip(distance_transform_edt(covered) / max(8, 0.04 * n), 0, 1)
+    alpha = 0.5 - 0.5 * np.cos(np.pi * alpha)
     rgba = np.dstack([rgb, alpha])[::-1]                      # north up for the PNG
     png = out / "mosaic.png"
     Image.fromarray((rgba * 255).astype(np.uint8), "RGBA").save(png)
@@ -108,11 +110,47 @@ def join(cell_dirs: list[Path], ra: float, dec: float, size: float, out: Path) -
     print("hips", sum(1 for _ in hips.rglob("*.png")), "tiles")
 
 
+def merge(sources: list[Path], dest: Path) -> None:
+    """Fold HiPS folders into one layer; where two cover the same tile, the newer one is drawn over the older."""
+    from PIL import Image
+    dest.mkdir(parents=True, exist_ok=True)
+    order, n = 0, 0
+    for src in sources:
+        for tile in src.rglob("Npix*.png"):
+            rel = tile.relative_to(src)
+            order = max(order, int(rel.parts[0].replace("Norder", "")))
+            out = dest / rel
+            out.parent.mkdir(parents=True, exist_ok=True)
+            if out.exists():
+                base = Image.open(out).convert("RGBA")
+                base.alpha_composite(Image.open(tile).convert("RGBA"))
+                base.save(out)
+            else:
+                shutil.copyfile(tile, out)
+            n += 1
+    (dest / "properties").write_text("\n".join([
+        "creator_did          = ivo://naylamp/P/spherex-deep",
+        "obs_title            = Naylamp SPHEREx deep sky",
+        "dataproduct_type     = image",
+        "hips_version         = 1.4",
+        "hips_frame           = equatorial",
+        f"hips_order           = {order}",
+        "hips_order_min       = 0",
+        "hips_tile_width      = 512",
+        "hips_tile_format     = png",
+        "hips_status          = public master unclonable",
+    ]) + "\n")
+    print("merged", n, "tiles, max order", order)
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("cells", help="print the cell grid as JSON")
     j = sub.add_parser("join", help="join cell deep images into a HiPS mosaic")
+    m = sub.add_parser("merge", help="fold several HiPS folders into one layer")
+    m.add_argument("sources", type=Path, nargs="+")
+    m.add_argument("--out", type=Path, required=True)
     for q in (c, j):
         q.add_argument("--ra", type=float, required=True)
         q.add_argument("--dec", type=float, required=True)
@@ -121,7 +159,9 @@ def main() -> None:
     j.add_argument("--cells", type=Path, required=True, help="folder holding one subfolder per cell, each with deep.json")
     j.add_argument("--out", type=Path, required=True)
     a = p.parse_args()
-    if a.cmd == "cells":
+    if a.cmd == "merge":
+        merge(a.sources, a.out)
+    elif a.cmd == "cells":
         print(json.dumps(cells(a.ra, a.dec, a.size, a.step)))
     else:
         join(sorted(x for x in a.cells.iterdir() if x.is_dir()), a.ra, a.dec, a.size, a.out)

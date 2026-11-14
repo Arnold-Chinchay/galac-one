@@ -23,6 +23,8 @@ async function json<T>(path: string, signal?: AbortSignal): Promise<T> {
   return JSON.parse((await response.text()).replace(/\bNaN\b/g, 'null')) as T
 }
 export const readJson = json
+/** Absolute URL of a file the Worker serves next to the API (tiles, HiPS layers). */
+export const siteUrl = (path: string) => fullUrl(API.replace(/\/api$/, '') + path)
 
 /** A name or id selects a field; otherwise a position resolves to the field whose footprint contains it. */
 function matches(field: Field, q: FieldQuery): boolean {

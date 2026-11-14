@@ -10,8 +10,8 @@ interface Props {
   /** Field to fly to; changing it animates the view. */
   focus?: { ra: number; dec: number } | null
   caption?: boolean
-  /** Deep images (folder URLs holding deep.json + deep_rgb.png) drawn into the map at their true position. */
-  deep?: string[]
+  /** Our deep HiPS layers (stacked SPHEREx exposures), drawn over the all-sky map. */
+  mosaics?: string[]
   /** Pixels on the right covered by a panel; fly-to targets land in the visible part. */
   inset?: number
 }
@@ -23,18 +23,9 @@ let loader: Promise<any> | null = null
 const rad = Math.PI / 180
 const sep = (ra1: number, de1: number, ra2: number, de2: number) =>
   Math.acos(Math.min(1, Math.sin(de1 * rad) * Math.sin(de2 * rad) + Math.cos(de1 * rad) * Math.cos(de2 * rad) * Math.cos((ra1 - ra2) * rad))) / rad
-function headerToWcs(text: string, shape: [number, number]) {
-  const wcs: Record<string, string | number> = {}
-  for (const line of text.split('\n')) {
-    const m = line.match(/^(\w+)\s*=\s*('([^']*)'|[^/]+)/)
-    if (m) wcs[m[1]] = m[3] !== undefined ? m[3].trim() : Number(m[2])
-  }
-  wcs.NAXIS = 2; wcs.NAXIS1 = shape[1]; wcs.NAXIS2 = shape[0]
-  return wcs
-}
 const loadAladin = () => (loader ??= import('aladin-lite').then(async m => { const A = m.default; await A.init; return A }))
 
-export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, box, onSelect, focus, caption = true, deep, inset = 0 }: Props) {
+export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, box, onSelect, focus, caption = true, mosaics, inset = 0 }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<any>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -42,7 +33,7 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
   const select = useRef(onSelect)
   select.current = onSelect
   const marksKey = marks?.map(m => m.id).join(',')
-  const deepKey = deep?.join(',')
+  const deepKey = mosaics?.join(',')
 
   useEffect(() => {
     let alive = true, al: any = null
@@ -59,20 +50,25 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
       map.current = al
       const hips = A.HiPS(SPHEREX_HIPS, { name: 'SPHEREx DR1 all-sky', imgFormat: 'png', cooFrame: 'equatorial', maxOrder: 5 })
       al.setBaseImageLayer(hips)
+      // False colour reads well for the whole sky; close up, grey sits better next to our true-colour mosaics.
+      let grey = false
+      const tint = (fov: number) => {
+        const want = fov < 6
+        if (want === grey) return
+        grey = want
+        try { hips.setColormap(want ? 'grayscale' : 'inferno', { stretch: 'asinh' }); hips.setCuts(want ? 105 : 0, 255) } catch { /* older builds */ }
+        if (allSky) { try { if (want) al.hideCooGrid(); else al.showCooGrid() } catch { /* no grid API */ } }
+      }
       try { hips.setColormap('inferno', { stretch: 'asinh' }) } catch { /* older builds: keep grey */ }
+      mosaics?.forEach((url, i) => {
+        al.setOverlayImageLayer(A.HiPS(url, { name: 'mosaic-' + i, imgFormat: 'png' }), 'mosaic-' + i)
+      })
       if (box) {
         const ov = A.graphicOverlay({ color: '#f5a524', lineWidth: 2 })
         al.addOverlay(ov)
         const h = box.sizeDeg / 2, c = Math.cos(box.dec * Math.PI / 180)
         ov.add(A.polygon([[box.ra + h / c, box.dec - h], [box.ra - h / c, box.dec - h], [box.ra - h / c, box.dec + h], [box.ra + h / c, box.dec + h]]))
       }
-      deep?.forEach((base, i) => {
-        fetch(base + 'deep.json').then(r => r.ok ? r.json() : null).then(meta => {
-          if (!alive || !meta?.wcs) return
-          const img = A.image(base + 'deep_rgb.png', { name: 'deep-' + i, imgFormat: 'png', wcs: headerToWcs(meta.wcs, meta.shape) })
-          al.setOverlayImageLayer(img, 'deep-' + i)
-        }).catch(() => { /* the field stays on the all-sky map */ })
-      })
       if (marks?.length) {
         const cat = A.catalog({ name: 'Challenge targets', sourceSize: 22, color: '#f5a524', shape: 'circle',
           displayLabel: true, labelColumn: 'title', labelColor: '#ffd38a', labelFont: '600 14px system-ui' })
@@ -82,6 +78,7 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
       al.on('zoomChanged', (f: any) => {
         const fov = Array.isArray(f) ? f[0] : typeof f === 'number' ? f : al.getFov()[0]
         if (fov < MIN_FOV * 0.98) al.setFoV(MIN_FOV)
+        tint(fov)
         setZoomed(fov < fovDeg * 0.9)
       })
       // A click flies toward the point and zooms in; a click near a field opens it.

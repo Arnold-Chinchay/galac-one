@@ -14,6 +14,10 @@ const finding: Record<string, [string, string]> = {
   'R Draconis': ['238 days', 'The pulsation period recovered from SPHEREx brightness alone.'],
 }
 
+// Every area we stacked (the five fields, then whole mosaics) lives in one HiPS layer that grows as regions are added.
+// Hosted as a public Hugging Face dataset (naylamp-space/spherex-deep-sky); a copy also sits in R2 under /tiles/hips/naylamp.
+const DEEP_SKY = 'https://huggingface.co/datasets/naylamp-space/spherex-deep-sky/resolve/main/hips/deep-sky'
+
 export default function Home({ targets, community, onOpen, onClassify, onTraining }: Props) {
   const [pickedTitle, setPickedTitle] = useState<string | null>(null)
   const picked = targets.find(t => t.title === pickedTitle) ?? null
@@ -22,7 +26,7 @@ export default function Home({ targets, community, onOpen, onClassify, onTrainin
   return <section className="sky-home">
     <SkyMap ra={180} dec={0} fovDeg={360} allSky height="100%" caption={false} marks={marks} inset={392}
       focus={picked ? { ra: picked.center.ra_deg, dec: picked.center.dec_deg } : null}
-      deep={targets.filter(t => t.manifest_url).map(t => new URL(t.manifest_url!.replace('manifest.json', 'deep/'), location.origin).href)}
+      mosaics={[DEEP_SKY]}
       onSelect={id => setPickedTitle(targets.find(x => x.tile_id === id)?.title ?? null)} />
 
     <aside className="sky-panel">
