@@ -83,15 +83,28 @@ def index_one(key: str) -> list | None:
     return None
 
 
-def index_week(release: str, week: str, workers: int = 48) -> Path:
+def _index_chunk(args: tuple[list[str], int]) -> list:
+    keys, threads = args
+    with ThreadPoolExecutor(max_workers=threads) as ex:
+        return [r for r in ex.map(index_one, keys) if r]
+
+
+def index_week(release: str, week: str, workers: int = 48, procs: int = 1) -> Path:
+    """procs > 1 spreads the CPU-bound header parsing over several processes (GIL workaround)."""
     out = OUT / release / f"{week}.csv.gz"
     if out.exists():
         print(f"{week}: already indexed")
         return out
     t = time.time()
     keys = list_keys(release, week)
-    with ThreadPoolExecutor(max_workers=workers) as ex:
-        rows = [r for r in ex.map(index_one, keys) if r]
+    if procs <= 1:
+        rows = _index_chunk((keys, workers))
+    else:
+        from concurrent.futures import ProcessPoolExecutor
+        step = -(-len(keys) // (procs * 4))  # 4 chunks per process for balance
+        chunks = [(keys[i:i + step], max(4, workers // procs)) for i in range(0, len(keys), step)]
+        with ProcessPoolExecutor(max_workers=procs) as ex:
+            rows = [r for part in ex.map(_index_chunk, chunks) for r in part]
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".part")
     with gzip.open(tmp, "wt", newline="") as f:
@@ -109,7 +122,9 @@ def main() -> None:
     ap.add_argument("--weeks", nargs="*", help="explicit week ids, e.g. 2025W18_1B")
     ap.add_argument("--week-slice", help="python slice over the sorted week list, e.g. 0:10")
     ap.add_argument("--list-weeks", action="store_true")
-    ap.add_argument("--workers", type=int, default=48)
+    ap.add_argument("--workers", type=int, default=48, help="total HTTP threads")
+    ap.add_argument("--procs", type=int, default=1, help="processes (use ~CPU cores to beat the GIL)")
+    ap.add_argument("--reverse", action="store_true", help="process weeks from the end (so two machines can meet in the middle)")
     a = ap.parse_args()
 
     weeks = list_weeks(a.release)
@@ -124,8 +139,10 @@ def main() -> None:
         sel = weeks[i:j]
     else:
         sel = weeks
+    if a.reverse:
+        sel = list(reversed(sel))
     for w in sel:
-        index_week(a.release, w, a.workers)
+        index_week(a.release, w, a.workers, a.procs)
 
 
 if __name__ == "__main__":
