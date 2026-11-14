@@ -74,3 +74,15 @@ Salida en `cache/tiles/<name>/` (no se sube a Git): `frames.json` ordenado por t
 3. `spectral_sub.py`: la resta espectral (experimento 1).
 4. `export_tile.py` + subida a R2 (necesita las claves S3 de R2, que se crean en el panel de Cloudflare).
 5. Worker de la API (votos y estadísticas) sobre la base D1 ya creada.
+
+## 7. Primera prueba con cielo real: WISE 0855 (14-nov-2026, tarde) — **resultado: NO validado todavía**
+Descargamos y procesamos el campo real (`python -m pipeline.fetch_tile --name wise0855 ... --source index`): **256/256 cuadros en 6 min, 0 fallos** (IRSA devuelve 503 con 8 descargas en paralelo; los reintentos lo resuelven). Alineado: 254/256 cuadros, λ de 0.745 a 4.98 µm, los 6 detectores.
+
+**Qué se aprendió:**
+1. **La resta espectral no demostró nada en este campo.** Es un campo vacío (mediana 0.02 MJy/sr, ruido ~0.015 por píxel y cuadro): la variación entre cuadros es solo ruido, así que "reducción ×1.007" no significa que falle ni que funcione. La métrica sintética (×55) no se puede comparar. **Hace falta un campo con estrellas brillantes** (p. ej. R Draconis o el campo de Barnard) para validarla de verdad.
+2. **5 de 254 cuadros están rotos:** 4 de D1 y 1 de D2 (λ ≈ 1.06–1.10 µm) tienen 78–90 % de los píxeles a más de 5σ. Hay que **detectarlos y descartarlos** (fracción de píxeles a >5σ del cuadro) antes de ajustar el modelo.
+3. **Los detectores D1 y D6 tienen colas pesadas** (11 % y 6 % de píxeles a >5σ vs 0.1-0.2 % en D3/D4), más allá de los cuadros rotos. Posible causa: fondo zodiacal residual que cambia con el tiempo y la λ en los extremos de banda. **Hipótesis a probar:** restar la mediana espacial de cada cuadro antes de ajustar.
+4. **Las coordenadas oficiales de WISE 0855 son de 2010.** Con 8″/año de movimiento propio, en 2026 está ~20 píxeles al oeste del centro. Con la cuadrícula de 40×40 (±20 px) **queda justo en el borde o fuera**: hay que **centrar los mosaicos de objetos con movimiento propio en su posición a la época de observación**, no en la del catálogo.
+5. **No encontramos a WISE 0855.** En la posición esperada hay una **estrella azul brillante** (~50σ en D1-D4, flujo que baja con λ), que no puede ser WISE 0855 (invisible por debajo de ~3.5 µm). Prueba que falta hacer: buscar una fuente **muy roja** (cociente D6/D1 enorme) cerca de esa posición. La posición predicha usa un movimiento propio de la literatura que **no verificamos** [verificar].
+
+**Pendiente inmediato:** validar la resta espectral en R Draconis/Barnard; añadir rechazo de cuadros rotos y resta de fondo por cuadro; centrado por movimiento propio.

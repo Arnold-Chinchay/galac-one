@@ -9,3 +9,6 @@ node_modules/
 cache/
 out/
 .dev.vars
+# real injection truth must NEVER be committed (public repo); only the fake mock seed is allowed
+tools/real_*
+tools/*truth*
