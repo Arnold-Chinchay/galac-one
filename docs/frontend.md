@@ -87,6 +87,10 @@ function drawFrame(canvas, tile, k, zmax = 5) {
 ```
 
 ## Local y despliegue
-Se puede trabajar en HTML/JS dentro de `web/public/` o con Vite en `web/app` (`npm create vite@latest app -- --template react`) llamando a la API en línea. Para publicar con Vite: en `wrangler.toml` cambiar `directory` a `./web/app/dist`, mover `web/public/mock-tile` a `web/app/public/mock-tile`, `npm run build` y `npx wrangler deploy` (requiere `npx wrangler login`).
+El front está en `focus-frontend/` (React + Vite + TypeScript) y es lo que sirve el Worker.
+- Local: `npm install` y `npm run dev` dentro de `focus-frontend/`. Para usar el API en vivo, crear `focus-frontend/.env.development.local` con `VITE_API_BASE_URL=https://naylamp-space.spacenaylamp.workers.dev/api`.
+- Pruebas: `npm test`.
+- Publicar: `npm run build` dentro de `focus-frontend/` (sin variables: usa `/api` del mismo origen) y `npx wrangler deploy` en la raíz. `wrangler.toml` sirve `focus-frontend/dist` con respaldo de SPA.
+- El adaptador entre el API y el visor es `src/data/naylamp.ts`. El mosaico de práctica (`mock`) viaja con el front en `public/mock-tile/`.
 
-Sin claves en el código; el front no necesita ninguna. Mantener el agradecimiento a NASA/SPHEREx visible. Si la API no alcanza, el Worker es `api/src/index.js`.
+Sin claves en el código; el front no necesita ninguna. Mantener el agradecimiento a NASA/SPHEREx visible.

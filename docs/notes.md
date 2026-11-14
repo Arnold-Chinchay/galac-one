@@ -30,6 +30,13 @@ Datos leídos directo desde S3 en GitHub Actions (`build-tile`, ~2 min por campo
 
 Las estrellas brillantes saturan: hay que usar alas o halo. La astrometría de Gaia está en `pipeline/targets.py` (WISE 0855 no está en Gaia; su movimiento propio es aproximado).
 
+## Imágenes profundas y más cielo (`deep.py`, workflow `build-deep`)
+- Campos de 0.4° (24′, 33× el área del mosaico de 4′) leídos de S3 en GitHub Actions. Cada exposición se alinea, se escala con una ganancia por cuadro contra la mediana del campo y se combina por banda (azul 0.7-1.6, verde 1.6-3, rojo 3-5 µm) con recorte a 3σ. Ruido medido con dos mitades independientes.
+- Ruido frente a una sola exposición: ×6-10 en Barnard, Epsilon Indi B, RW Aurigae y WISE 0855 (75-154 cuadros por banda); ×16-28 en R Draconis (2 080 cuadros).
+- **Drizzle 2×** (paquete `drizzle`, pixfrac 0.6, píxeles de 3.08″): en Barnard, 127-174 estrellas por banda pasan de ~12″ a ~7.6″ de FWHM (32-36 % más finas) frente a nuestra versión nativa; el ruido por píxel fino queda ×2-5 bajo una exposición. Es la imagen que muestra la web.
+- Núcleos saturados se rellenan con el borde más brillante solo para el PNG; el FITS (`deep_lum.fits`, suma de bandas en unidades de σ) y los `deep_*.f16.bin` no se tocan.
+- **Mapa de todo el cielo:** HiPS DR1 de IRSA (`irsa.ipac.caltech.edu/data/hips/SPHEREx/spherex_allsky_cube`, PNG 512 px, CORS abierto, ~12.9″/píxel) mostrado con Aladin Lite 3.9.2 (npm, carga diferida). No usar su capa por defecto: viene de CDS.
+
 ## Detección y mosaicos (`detect.py`, `make_tile.py`)
 - Picos del filtro 3×3 sobre el z-score (umbral 6, se ignoran píxeles con σ > 2× la mediana). Móviles: líneas rectas ajustadas por mínimos cuadrados (≥ 5 cuadros). Estáticos: grupos en el mismo píxel (≥ 4 cuadros, máx. 15).
 - `make_tile` inyecta 6 móviles sintéticos y agrega 4 **controles en cielo vacío** (sin nada inyectado). Recuperó 27 de 30 inyecciones en los 5 campos.

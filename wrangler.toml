@@ -2,10 +2,12 @@ name = "naylamp-space"
 main = "api/src/index.js"
 compatibility_date = "2026-11-01"
 
-# Static web (web/public) is served by the same Worker; /api/* and /tiles/* are handled in code.
+# The built front (focus-frontend/dist) is served by the same Worker; /api/* and /tiles/* are handled in code.
 [assets]
-directory = "./web/public"
+directory = "./focus-frontend/dist"
 binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/tiles/*"]
 
 [[d1_databases]]
 binding = "DB"

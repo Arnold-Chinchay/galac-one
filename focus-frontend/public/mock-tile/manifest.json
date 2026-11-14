@@ -1,0 +1,32 @@
+{
+ "contract_version": 1,
+ "id": "mock",
+ "label": "Synthetic demo tile (fake sky, real pipeline)",
+ "release": "MOCK",
+ "ra": 150.0,
+ "dec": 2.2,
+ "fov_deg": 0.06833333333333333,
+ "pix_arcsec": 6.15,
+ "shape": {
+  "n_frames": 240,
+  "height": 40,
+  "width": 40
+ },
+ "dtype": "float16-le",
+ "layout": "index = (frame*H + y)*W + x. y=0 is the SOUTH edge (flip vertically to show north up); x=0 is the EAST edge (RA grows toward x=0).",
+ "mjd_range": [
+  61000.0,
+  61011.95
+ ],
+ "lam_range_um": [
+  0.7517750124052495,
+  4.9832560356471705
+ ],
+ "files": [
+  "frames.json",
+  "residuals.f16.bin",
+  "science.f16.bin",
+  "candidates.json"
+ ],
+ "created": "2026-11-14T19:16:52+00:00"
+}
