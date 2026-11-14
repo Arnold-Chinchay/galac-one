@@ -16,6 +16,9 @@ on:
       oversample:
         description: "Output pixels per SPHEREx pixel (1 native, 2 finer)"
         default: "1"
+      method:
+        description: "adaptive, interp or drizzle"
+        default: "adaptive"
 
 permissions:
   contents: read
@@ -55,9 +58,9 @@ jobs:
       - name: Fetch from S3
         run: python -m pipeline.fetch_tile --target ${{ matrix.target }} --name $NAME --fov ${{ inputs.fov }} --workers 24 --via s3 --source index --index cache/merged/dr1_index.csv.gz cache/merged/qr3_index.csv.gz
       - name: Deep stack
-        run: python -m pipeline.deep --name $NAME --size ${{ inputs.size }} --oversample ${{ inputs.oversample }} --procs 4
+        run: python -m pipeline.deep --name $NAME --size ${{ inputs.size }} --oversample ${{ inputs.oversample }} --method ${{ inputs.method }} --procs 4
       - uses: actions/upload-artifact@v4
         with:
-          name: deep-${{ matrix.target }}
+          name: deep-${{ matrix.target }}-x${{ inputs.oversample }}-${{ inputs.method }}
           path: cache/tiles/${{ matrix.target }}-wide/deep/
           retention-days: 5
