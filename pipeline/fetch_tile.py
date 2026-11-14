@@ -43,15 +43,23 @@ def main() -> None:
     ap.add_argument("--max-frames", type=int, default=0, help="0 = all")
     ap.add_argument("--frames-json", help='fallback list: [{"uri": "...", "mjd": 0}] when TAP is down')
     ap.add_argument("--keep-raw", action="store_true")
+    ap.add_argument("--source", choices=["auto", "tap", "index"], default="auto",
+                    help="auto = IRSA TAP if it is up, else our S3 index (pipeline/s3index.py)")
+    ap.add_argument("--release", default="dr1")
+    ap.add_argument("--index", help="path to a merged index .csv.gz (default: cache/index/<release>/*.csv.gz)")
     a = ap.parse_args()
 
     if a.frames_json:
         frames = json.loads(Path(a.frames_json).read_text())
         print(f"frames from {a.frames_json}: {len(frames)}")
-    else:
-        print("TAP up:", tap_is_up())
+    elif a.source == "tap" or (a.source == "auto" and tap_is_up()):
         frames = query_frames(a.ra, a.dec)
-        print(f"frames from TAP: {len(frames)}")
+        print(f"frames from IRSA TAP: {len(frames)}")
+    else:
+        from .frames_index import frames_at, load_index
+        idx = load_index(a.release, Path(a.index) if a.index else None)
+        frames = frames_at(a.ra, a.dec, idx, margin_deg=a.fov / 2)
+        print(f"frames from our S3 index ({len(idx['key'])} images indexed): {len(frames)}")
     if a.max_frames:
         frames = frames[: a.max_frames]
 

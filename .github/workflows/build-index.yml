@@ -1,0 +1,99 @@
+name: build-index
+
+# Builds our own spatial index of every SPHEREx Level-2 image by reading only the FITS headers
+# (range reads, ~31 KB/file) from the public AWS bucket nasa-irsa-spherex. See pipeline/s3index.py.
+# Result: a public GitHub Release "index-<release>" with <release>_index.csv.gz.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Data release prefix in the bucket (dr1, qr3)"
+        default: "dr1"
+      weeks_per_job:
+        description: "Weeks per parallel job"
+        default: "5"
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install boto3 astropy --quiet
+      - id: m
+        run: |
+          python - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json
+          from pipeline.s3index import list_weeks
+          weeks = list_weeks("${{ inputs.release }}")
+          n = int("${{ inputs.weeks_per_job }}")
+          chunks = [" ".join(weeks[i:i + n]) for i in range(0, len(weeks), n)]
+          print("matrix=" + json.dumps({"weeks": chunks}))
+          EOF
+
+  index:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install boto3 astropy --quiet
+      - run: python -m pipeline.s3index --release ${{ inputs.release }} --weeks ${{ matrix.weeks }} --workers 64
+      - id: name
+        run: echo "n=$(echo '${{ matrix.weeks }}' | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: index-${{ inputs.release }}-${{ steps.name.outputs.n }}
+          path: cache/index/${{ inputs.release }}/*.csv.gz
+          retention-days: 7
+
+  merge:
+    needs: index
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: index-${{ inputs.release }}-*
+          path: parts
+          merge-multiple: true
+      - name: Merge weekly files
+        run: |
+          python - <<'EOF'
+          import csv, glob, gzip
+          files = sorted(glob.glob("parts/*.csv.gz"))
+          n = 0
+          with gzip.open("${{ inputs.release }}_index.csv.gz", "wt", newline="") as out:
+              w = None
+              for f in files:
+                  with gzip.open(f, "rt", newline="") as fh:
+                      r = csv.reader(fh)
+                      header = next(r)
+                      if w is None:
+                          w = csv.writer(out); w.writerow(header)
+                      for row in r:
+                          w.writerow(row); n += 1
+          print(f"merged {len(files)} weeks, {n} images")
+          open("summary.txt", "w").write(f"{len(files)} weeks, {n} images\n")
+          EOF
+      - name: Publish as release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="index-${{ inputs.release }}"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "SPHEREx ${{ inputs.release }} spatial index" --notes "Built from FITS headers in s3://nasa-irsa-spherex/${{ inputs.release }}/level2 by pipeline/s3index.py. $(cat summary.txt)"
+          gh release upload "$TAG" "${{ inputs.release }}_index.csv.gz" --clobber
