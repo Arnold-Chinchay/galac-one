@@ -14,6 +14,9 @@ TARGETS = {
     # Not in Gaia. Challenge position (WISE epoch ~2010.5) and approximate literature proper motion: unverified.
     "wise0855": {"label": "WISE 0855-0714", "ra": 133.79513, "dec": -7.24515, "pmra": -8100.0, "pmdec": 700.0,
                  "epoch": 2010.5, "kind": "proper motion"},
+    # Fixed centre between the 2010 position and the predicted 2026 one, for a wide search (no motion assumed).
+    "wise0855wide": {"label": "WISE 0855 search field", "ra": 133.7775, "dec": -7.2437, "pmra": 0.0, "pmdec": 0.0,
+                     "epoch": 2016.0, "kind": "search"},
 }
 
 
