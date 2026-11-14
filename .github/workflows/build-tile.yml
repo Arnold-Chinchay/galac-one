@@ -1,0 +1,56 @@
+# Download and align target fields from the public S3 bucket. Injections and export run locally
+# (artifacts of a public repository are public, and the injection truth must stay private).
+name: build-tile
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: "Target names from pipeline/targets.py, space separated"
+        default: "barnard epsindib rwaur wise0855"
+      fov:
+        description: "Cutout size in degrees"
+        default: "0.1"
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        run: echo "matrix=$(python3 -c "import json,sys; print(json.dumps({'target': sys.argv[1].split()}))" "${{ inputs.targets }}")" >> "$GITHUB_OUTPUT"
+
+  tile:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r pipeline/requirements.txt --quiet
+      - name: Image index
+        run: |
+          mkdir -p cache/merged
+          gh release download index-dr1 -p dr1_index.csv.gz -D cache/merged
+          gh release download index-qr3 -p qr3_index.csv.gz -D cache/merged
+      - name: Fetch from S3
+        run: python -m pipeline.fetch_tile --target ${{ matrix.target }} --fov ${{ inputs.fov }} --workers 24 --via s3 --source index --index cache/merged/dr1_index.csv.gz cache/merged/qr3_index.csv.gz
+      - name: Align
+        run: python -m pipeline.align --name ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aligned-${{ matrix.target }}
+          path: |
+            cache/tiles/${{ matrix.target }}/aligned.npz
+            cache/tiles/${{ matrix.target }}/frames.json
+          retention-days: 5

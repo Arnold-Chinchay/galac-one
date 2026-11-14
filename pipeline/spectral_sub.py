@@ -101,7 +101,7 @@ def diagnostics(res: SubResult, image: np.ndarray) -> dict:
 
 
 def fit_with_gain(image: np.ndarray, lam: np.ndarray, groups: np.ndarray, n_outer: int = 4,
-                  min_snr: float = 20.0, **kw) -> SubResult:
+                  min_snr: float = 20.0, exclude: np.ndarray | None = None, **kw) -> SubResult:
     """fit_static plus a per-frame gain estimated from the bright static sources of the field.
 
     groups labels each frame's detector. The mean gain of a detector is not fitted because the pixel
@@ -115,6 +115,8 @@ def fit_with_gain(image: np.ndarray, lam: np.ndarray, groups: np.ndarray, n_oute
         res = fit_static(corrected, lam, **kw)
         floor = np.nanmedian(res.sigma) * np.median(res.frame_scale)
         pix = np.nanmedian(res.model, axis=0) > min_snr * floor
+        if exclude is not None:
+            pix &= ~exclude
         if pix.sum() < 5:
             break
         with np.errstate(divide="ignore", invalid="ignore"):

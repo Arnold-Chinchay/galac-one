@@ -50,6 +50,15 @@ def make_injections(rng, n, mjd, shape, sigma, snr_range=(7.0, 14.0), margin=5):
     return out
 
 
+def inject_movers(image, inj, sigma, fscale):
+    H, W = image.shape[1:]
+    yy, xx = np.indices((H, W))
+    for s in inj:
+        for f in s["frames"]:
+            amp = s["snr"] * sigma[int(round(s["y"][f])), int(round(s["x"][f]))] * fscale[f] / 1.6
+            image[f] += amp * np.exp(-((yy - s["y"][f]) ** 2 + (xx - s["x"][f]) ** 2) / (2 * 1.1 ** 2))
+
+
 def opaque_id(name, seed, k):
     return f"{name}-" + hashlib.sha1(f"{name}:{seed}:{k}".encode()).hexdigest()[:8]
 
@@ -76,11 +85,7 @@ def main() -> None:
 
     rng = np.random.default_rng(a.seed)
     inj = make_injections(rng, a.n_inject, mjd, image.shape, res.sigma)
-    yy, xx = np.indices((H, W))
-    for s in inj:
-        for f in s["frames"]:
-            amp = s["snr"] * res.sigma[int(round(s["y"][f])), int(round(s["x"][f]))] * fscale[f] / 1.6
-            image[f] += amp * np.exp(-((yy - s["y"][f]) ** 2 + (xx - s["x"][f]) ** 2) / (2 * 1.1 ** 2))
+    inject_movers(image, inj, res.sigma, fscale)
 
     res = fit_with_gain(image, lam, det)
     found = find_candidates(res.z, res.sigma, mjd)

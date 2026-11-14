@@ -16,14 +16,19 @@ from .irsa import CACHE, cutout_url, download_cutout, query_frames, tap_is_up
 from .reduce import reduce_cutout
 
 
-def process_frame(i: int, fr: dict, ra: float, dec: float, fov: float, tile_dir: Path, keep_raw: bool) -> dict:
-    url = cutout_url(fr["uri"], ra, dec, fov)
-    raw = CACHE / "raw" / (tile_dir.name + f"_{i:04d}.fits")
-    download_cutout(url, raw)
-    red = reduce_cutout(raw)
+def process_frame(i: int, fr: dict, ra: float, dec: float, fov: float, tile_dir: Path, keep_raw: bool, via: str = "irsa") -> dict:
+    if via == "s3":
+        from .s3cutout import s3_cutout
+        red = s3_cutout(fr["key"], ra, dec, fov)
+        raw = None
+    else:
+        url = cutout_url(fr["uri"], ra, dec, fov)
+        raw = CACHE / "raw" / (tile_dir.name + f"_{i:04d}.fits")
+        download_cutout(url, raw)
+        red = reduce_cutout(raw)
     npz = tile_dir / f"frame_{i:04d}.npz"
     np.savez_compressed(npz, **{k: v for k, v in red.items() if k != "meta"})
-    if not keep_raw:
+    if raw is not None and not keep_raw:
         raw.unlink(missing_ok=True)
     meta = red["meta"] | {"file": npz.name, "uri": fr["uri"], "index": i}
     return meta
@@ -31,13 +36,15 @@ def process_frame(i: int, fr: dict, ra: float, dec: float, fov: float, tile_dir:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--name", required=True)
-    ap.add_argument("--ra", type=float, required=True)
-    ap.add_argument("--dec", type=float, required=True)
+    ap.add_argument("--name")
+    ap.add_argument("--target", help="name in pipeline/targets.py: centre on its position at the epoch of the frames")
+    ap.add_argument("--ra", type=float)
+    ap.add_argument("--dec", type=float)
     ap.add_argument("--fov", type=float, default=0.1, help="cutout size in degrees")
     ap.add_argument("--workers", type=int, default=4, help="parallel downloads (be polite to IRSA: <= 8)")
     ap.add_argument("--max-frames", type=int, default=0, help="0 = all")
     ap.add_argument("--frames-json", help='fallback list: [{"uri": "...", "mjd": 0}] when TAP is down')
+    ap.add_argument("--via", choices=["irsa", "s3"], default="s3", help="s3: range reads from the public bucket (faster, no IRSA load)")
     ap.add_argument("--stride", type=int, default=1, help="take every Nth frame (sorted by time)")
     ap.add_argument("--keep-raw", action="store_true")
     ap.add_argument("--source", choices=["auto", "tap", "index"], default="auto",
@@ -45,6 +52,16 @@ def main() -> None:
     ap.add_argument("--release", default="dr1")
     ap.add_argument("--index", nargs="+", help="index .csv.gz file(s), e.g. cache/merged/dr1_index.csv.gz cache/merged/qr3_index.csv.gz")
     a = ap.parse_args()
+    a.name = a.name or a.target
+    if a.target:
+        from .frames_index import frames_at, load_merged
+        from .targets import position_at
+        idx = load_merged(a.index)
+        ra0, dec0 = position_at(a.target, 61000.0)
+        hits = frames_at(float(ra0), float(dec0), idx, margin_deg=a.fov / 2)
+        ra, dec = position_at(a.target, float(np.median([h["mjd"] for h in hits])))
+        a.ra, a.dec = float(ra), float(dec)
+        print(f"{a.target}: centre at the median epoch {a.ra:.6f} {a.dec:+.6f}")
 
     if a.frames_json:
         frames = json.loads(Path(a.frames_json).read_text())
@@ -68,7 +85,7 @@ def main() -> None:
 
     metas, failed = [], []
     with ThreadPoolExecutor(max_workers=a.workers) as ex:
-        futs = {ex.submit(process_frame, i, fr, a.ra, a.dec, a.fov, tile_dir, a.keep_raw): i for i, fr in enumerate(frames)}
+        futs = {ex.submit(process_frame, i, fr, a.ra, a.dec, a.fov, tile_dir, a.keep_raw, a.via): i for i, fr in enumerate(frames)}
         for f in tqdm(as_completed(futs), total=len(futs), desc=a.name):
             try:
                 metas.append(f.result())
