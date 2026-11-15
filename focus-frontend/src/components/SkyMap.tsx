@@ -18,6 +18,8 @@ interface Props {
   minFov?: number
   /** Text of the button that returns to the starting view. */
   resetLabel?: string
+  /** JSON with the HEALPix regions stacked so far ({order, regions: {pix: …}}): outlined when looking from afar. */
+  coverageUrl?: string
 }
 
 // The public map stops at 12.9″ pixels; below a degree it turns to blocks except where our deep images sit.
@@ -29,7 +31,7 @@ const sep = (ra1: number, de1: number, ra2: number, de2: number) =>
   Math.acos(Math.min(1, Math.sin(de1 * rad) * Math.sin(de2 * rad) + Math.cos(de1 * rad) * Math.cos(de2 * rad) * Math.cos((ra1 - ra2) * rad))) / rad
 const loadAladin = () => (loader ??= import('aladin-lite').then(async m => { const A = m.default; await A.init; return A }))
 
-export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, box, onSelect, focus, caption = true, mosaics, inset = 0, minFov = MIN_FOV, resetLabel = 'Whole sky' }: Props) {
+export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, box, onSelect, focus, caption = true, mosaics, inset = 0, minFov = MIN_FOV, resetLabel = 'Whole sky', coverageUrl }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<any>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -70,6 +72,16 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
         try { deep.setGamma?.(0.7) } catch { /* older builds */ }
         al.setOverlayImageLayer(deep, 'mosaic-' + i)
       })
+      // A thin outline around what we have stacked, only from afar: close up the sharper image already shows it.
+      let outline: any = null
+      const showOutline = (fov: number) => { try { if (fov > 4) outline?.show(); else outline?.hide() } catch { /* older builds */ } }
+      if (coverageUrl) fetch(coverageUrl, { referrerPolicy: 'no-referrer' }).then(r => r.ok ? r.json() : null).then(c => {
+        if (!alive || !c?.regions) return
+        outline = A.MOCFromJSON({ [String(c.order ?? 5)]: Object.keys(c.regions).map(Number) },
+          { name: 'Stacked so far', color: '#78ecdb', opacity: 0.9, lineWidth: 1.2, fill: false, perimeter: true, edge: false })
+        al.addMOC(outline)
+        showOutline(al.getFov()[0])
+      }).catch(() => { /* the map works without it */ })
       if (box) {
         const ov = A.graphicOverlay({ color: '#f5a524', lineWidth: 2 })
         al.addOverlay(ov)
@@ -86,6 +98,7 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
         const fov = Array.isArray(f) ? f[0] : typeof f === 'number' ? f : al.getFov()[0]
         if (fov < minFov * 0.98) al.setFoV(minFov)
         tint(fov)
+        showOutline(fov)
         setZoomed(fov < fovDeg * 0.9)
       })
       // A click flies toward the point and zooms in; a click near a field opens it.

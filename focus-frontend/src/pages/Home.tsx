@@ -50,7 +50,7 @@ export default function Home({ targets, community, onOpen, onClassify, onTrainin
   return <section className="sky-home">
     <SkyMap ra={180} dec={0} fovDeg={360} allSky height="100%" caption={false} marks={marks} inset={392}
       focus={picked ? { ra: picked.center.ra_deg, dec: picked.center.dec_deg } : spot}
-      mosaics={[DEEP_SKY]}
+      mosaics={[DEEP_SKY]} coverageUrl={DEEP_SKY.replace('hips/deep-sky', 'state/regions.json')}
       onSelect={id => { if (id.startsWith('cold:')) { const c = cold[+id.slice(5)]; if (c) setSpot({ ra: c.ra, dec: c.dec }); return } setPickedTitle(targets.find(x => x.tile_id === id)?.title ?? null) }} />
 
     <aside className="sky-panel">
