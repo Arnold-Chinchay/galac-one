@@ -17,7 +17,7 @@ function risesTo45(s: RedSource): boolean {
   return false
 }
 
-export default function SkySearch({ onFocus }: { onFocus: (ra: number, dec: number) => void }) {
+export default function SkySearch({ onFocus, onCandidates }: { onFocus: (ra: number, dec: number) => void; onCandidates?: (c: RedSource[]) => void }) {
   const [done, setDone] = useState<number | null>(null), [index, setIndex] = useState<Index | null>(null)
   useEffect(() => {
     const c = new AbortController()
@@ -28,6 +28,8 @@ export default function SkySearch({ onFocus }: { onFocus: (ra: number, dec: numb
   }, [])
   // Cold-dwarf-like sources only: motion alone is not trusted over thousands of tests (see sky_publish.py).
   const cold = (index?.sources ?? []).filter(s => s.y_dwarf_like && risesTo45(s))
+  const coldKey = cold.map(s => `${s.ra},${s.dec}`).join(';')
+  useEffect(() => { onCandidates?.(cold) }, [coldKey])
   const best = [...cold].sort((a, b) => b.excess_snr - a.excess_snr).slice(0, 5)
   return <div className="sky-search">
     <span className="eyebrow">AUTOMATIC SEARCH · RUNS EVERY 2 HOURS</span>

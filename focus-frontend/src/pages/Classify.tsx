@@ -12,6 +12,7 @@ import { Icon } from '../components/Icons'
 import FrameCanvas from '../components/FrameCanvas'
 import Pictogram from '../components/Pictogram'
 import FollowStar from '../components/FollowStar'
+import SkyHunt from '../components/SkyHunt'
 
 const CHOICES: { label: Label; title: string; hint: string }[] = [
   { label: 'moving', title: 'It moves', hint: 'Changes place over time' },
@@ -23,6 +24,8 @@ const ANSWER: Record<Label, string> = {
   moving: 'it moves along a line.', variable: 'it blinks in place.', artifact: 'it’s a glitch: one photograph only.', unsure: 'unclear.',
 }
 const INTRO_KEY = 'galac.classify-intro.v1'
+const MODE_KEY = 'galac.classify-mode.v1'
+type Mode = 'spots' | 'follow' | 'hunt'
 
 function HowItWorks({ onPractice, onStart, onClose }: { onPractice: () => void; onStart: () => void; onClose: () => void }) {
   const steps: [string, string, ReactNode][] = [
@@ -58,7 +61,9 @@ export default function ClassifyPage(p: Props) {
   const { tile, candidate, training } = p
   const [intro, setIntro] = useState(() => !safeRead<boolean>(INTRO_KEY, false))
   const [view, setView] = useState<'residual' | 'science'>('residual')
-  const [mode, setMode] = useState<'spots' | 'follow'>('spots')
+  // The chosen mode survives a change of field (which reloads the page's data) and a later visit.
+  const [mode, setModeState] = useState<Mode>(() => { const m = safeRead<string>(MODE_KEY, 'spots'); return m === 'follow' || m === 'hunt' ? m : 'spots' })
+  const setMode = (m: Mode) => { setModeState(m); safeWrite(MODE_KEY, m) }
   const [clues, setClues] = useState(false), [profile, setProfile] = useState(false)
   const [k, setK] = useState(0), [playing, setPlaying] = useState(true), [delay, setDelay] = useState(420)
   const [game, setGame] = useState<Game>(loadGame)
@@ -92,7 +97,7 @@ export default function ClassifyPage(p: Props) {
   }, [playing, seq.length, delay])
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.closest('input,textarea,select') || intro || mode === 'follow') return
+      if ((e.target as HTMLElement)?.closest('input,textarea,select') || intro || mode !== 'spots') return
       if (e.code === 'Space') { e.preventDefault(); setPlaying(v => !v) }
       if (e.key === 'ArrowRight') { e.preventDefault(); setPlaying(false); setK(n => (n + 1) % Math.max(1, seq.length)) }
       if (e.key === 'ArrowLeft') { e.preventDefault(); setPlaying(false); setK(n => (n - 1 + seq.length) % Math.max(1, seq.length)) }
@@ -138,7 +143,7 @@ export default function ClassifyPage(p: Props) {
   // Answer keys live in App for real spots; practice keeps its answer on screen until Next.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.closest('input,textarea,select') || intro || mode === 'follow') return
+      if ((e.target as HTMLElement)?.closest('input,textarea,select') || intro || mode !== 'spots') return
       const i = ['1', '2', '3', '4'].indexOf(e.key)
       if (i >= 0) { e.preventDefault(); e.stopImmediatePropagation(); choose(CHOICES[i].label) }
       if (e.key === 'Enter') { e.preventDefault(); e.stopImmediatePropagation(); next() }
@@ -163,12 +168,13 @@ export default function ClassifyPage(p: Props) {
       <div className="segmented play-modes" role="tablist" aria-label="How to help">
         <button role="tab" aria-selected={mode === 'spots'} className={mode === 'spots' ? 'active' : ''} onClick={() => setMode('spots')}>Spot check</button>
         <button role="tab" aria-selected={mode === 'follow'} className={mode === 'follow' ? 'active' : ''} onClick={() => setMode('follow')}>Follow a star</button>
+        <button role="tab" aria-selected={mode === 'hunt'} className={mode === 'hunt' ? 'active' : ''} onClick={() => setMode('hunt')}>Sky hunt</button>
       </div>
-      <label className="field-select"><span>Field</span>
+      {mode !== 'hunt' && <label className="field-select"><span>Field</span>
         <select value={training ? '__practice' : tile.manifest.tile_id} onChange={e => { if (e.target.value === '__practice') p.onTraining(); else { const t = fields.find(x => x.tile_id === e.target.value); if (t) p.onField(t) } }}>
           <option value="__practice">Practice (answers shown)</option>
           {fields.map(t => <option key={t.tile_id} value={t.tile_id}>{t.title}</option>)}
-        </select></label>
+        </select></label>}
       <button className="score-pill" onClick={() => setProfile(v => !v)} aria-expanded={profile} title="Your rank, badges and the leaderboard">
         <span className="rank-badge">{rank.level}</span>
         <span className="score-text"><strong>{rank.name}</strong><small>{game.xp} pts{rank.to ? ` · ${rank.to - game.xp} to ${rank.nextName}` : ''}</small><i className="xp-bar"><b style={{ width: `${rank.progress * 100}%` }} /></i></span>
@@ -184,7 +190,12 @@ export default function ClassifyPage(p: Props) {
       </div>}
     </header>
 
-    {mode === 'follow' ? <div className="play-follow"><FollowStar tile={tile} /></div> : <div className="play-main">
+    {mode === 'hunt' ? <SkyHunt alias={game.alias} onAnswered={cold => {
+      const r = scoreAnswer(game, 'sky', { practice: false })
+      update(r.game)
+      if (r.unlocked.length) setBadge(r.unlocked[r.unlocked.length - 1])
+      void cold
+    }} /> : mode === 'follow' ? <div className="play-follow"><FollowStar tile={tile} /></div> : <div className="play-main">
       <section className="arena" aria-label="Close-up of the flagged spot">
         {complete && !training ? <div className="field-done">
           <span className="done-mark"><Icon name="check" size={28} /></span>

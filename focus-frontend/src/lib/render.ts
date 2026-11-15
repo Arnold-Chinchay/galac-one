@@ -64,6 +64,26 @@ function kernel(x: number): number {
   if (a < 2) return ((-B - 6 * C) * a ** 3 + (6 * B + 30 * C) * a ** 2 + (-12 * B - 48 * C) * a + (8 * B + 24 * C)) / 6
   return 0
 }
+/** Noise left after soften() on unit noise (product of the per-axis kernel norms): dividing by it keeps the residual
+ * in units of the noise, so sources the size of the SPHEREx PSF stand out more and single-pixel hits less. */
+const BLUR_NOISE = 0.3534
+
+/** Light blur (Gaussian, sigma 0.6 px) so single-pixel steps of a 6″ grid read as soft light, not tiles. */
+export function soften(plane: Float32Array, w: number, h: number): Float32Array {
+  const k = [0.0277, 0.2196, 0.5054, 0.2196, 0.0277], tmp = new Float32Array(w * h), out = new Float32Array(w * h)
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let s = 0, n = 0
+    for (let d = -2; d <= 2; d++) { const xx = x + d; if (xx >= 0 && xx < w) { s += plane[y * w + xx] * k[d + 2]; n += k[d + 2] } }
+    tmp[y * w + x] = s / n
+  }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let s = 0, n = 0
+    for (let d = -2; d <= 2; d++) { const yy = y + d; if (yy >= 0 && yy < h) { s += tmp[yy * w + x] * k[d + 2]; n += k[d + 2] } }
+    out[y * w + x] = s / n
+  }
+  return out
+}
+
 export function enlarge(plane: Float32Array, w: number, h: number, scale: number, smooth: boolean): Float32Array {
   const W = w * scale, H = h * scale, out = new Float32Array(W * H)
   if (!smooth) {
@@ -183,7 +203,7 @@ export function drawFrame(canvas: HTMLCanvasElement, tile: Tile, k: number, opti
     const c = cut(raw as Float32Array, cube.w, cube.h, crop, NaN)
     w = c.w; h = c.h
     if (options.mask) masked = c.plane.map(v => Number.isFinite(v) ? 0 : 1)
-    planes = [view === 'science' ? inpaint(c.plane, w, h, cube.stretch.lo) : c.plane.map(v => Number.isFinite(v) ? v : 0)]
+    planes = [view === 'science' ? inpaint(c.plane, w, h, cube.stretch.lo) : soften(c.plane.map(v => Number.isFinite(v) ? v : 0), w, h).map(v => v / BLUR_NOISE)]
   }
   const W = w * scale, H = h * scale, big = planes.map(p => enlarge(p, w, h, scale, smooth))
   const flags = masked ? enlarge(masked, w, h, scale, false) : null
@@ -194,7 +214,9 @@ export function drawFrame(canvas: HTMLCanvasElement, tile: Tile, k: number, opti
     if (view === 'science') { const t = asinhScale(big[0][i], lo, hi, soft); r = ramp(INFERNO, t, 0); g = ramp(INFERNO, t, 1); b = ramp(INFERNO, t, 2) }
     else if (view === 'residual') {
       // Brighter than the static sky glows amber, fainter glows blue, no change stays dark.
-      const v = big[0][i], a = Math.min(1, Math.max(0, Math.abs(v) - 1.5) / 6)
+      // Soft compression: faint changes grow quickly, the huge leftovers of saturated stars level off instead of
+      // turning into flat white and blue blocks.
+      const v = big[0][i], a = Math.min(1, Math.asinh(Math.max(0, Math.abs(v) - 1.5) / 2) / Math.asinh(5))
       if (v >= 0) { r = 14 + 241 * Math.min(1, a * 1.6); g = 20 + 200 * a + 35 * Math.max(0, a - .6) * 2.5; b = 34 + 40 * a + 181 * Math.max(0, a - .6) * 2.5 }
       else { r = 14 + 40 * a; g = 20 + 130 * a; b = 34 + 221 * a }
     } else { const gain = view === 'motion' ? 255 : 255; r = 10 + big[0][i] * gain; g = 14 + big[1][i] * gain; b = 26 + big[2][i] * gain }

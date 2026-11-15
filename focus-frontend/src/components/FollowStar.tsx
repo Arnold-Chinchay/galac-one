@@ -78,6 +78,15 @@ export default function FollowStar({ tile }: { tile: Tile }) {
   const fi = seq[Math.min(k, Math.max(0, seq.length - 1))], frame = fi !== undefined ? tile.frames[fi] : undefined
   const here = tr && fi !== undefined ? tr.points[fi] : undefined
   const det = tr?.points.filter(q => q.detected) ?? []
+  // Saturated: the chosen pixel is masked (blank) in most photographs.
+  const saturated = useMemo(() => {
+    const c = tile.cube
+    if (!tr || !c) return false
+    const i = tr.start.y * c.w + tr.start.x, size = c.w * c.h
+    let blank = 0
+    for (let k = 0; k < c.n; k++) if (!Number.isFinite(c.science[k * size + i])) blank++
+    return blank > c.n / 2
+  }, [tr, tile])
   const m = tr?.motion
   const moves = !!m && m.significance >= 5 && m.total >= 1
   // The brightness change is summed over ~7 pixels of unit noise, so pure noise scatters by about sqrt(7).
@@ -121,7 +130,7 @@ export default function FollowStar({ tile }: { tile: Tile }) {
               {tr && <circle cx={tr.start.x + .5} cy={tr.start.y + .5} r={1.6} fill="none" stroke="#ffb454" strokeWidth={.25} />}
             </svg>
           </div>
-          <p className="loop-caption">Click any dot to follow it through all {tile.frames.length} photographs, or drag to frame an area and watch it. Blue-white dots are ordinary stars; red ones are cool objects.</p>
+          <p className="loop-caption">Click a dot to follow it, or drag to frame an area.</p>
         </div>
         {crop ? <div>
           <div className="loop small" onClick={clickLoop} title={area && !tr ? 'Click a dot here to follow it' : undefined} style={{ cursor: area && !tr ? 'crosshair' : 'default' }}>
@@ -136,14 +145,16 @@ export default function FollowStar({ tile }: { tile: Tile }) {
             <input type="range" min={0} max={Math.max(0, seq.length - 1)} value={Math.min(k, Math.max(0, seq.length - 1))} aria-label="Photograph" onChange={e => { setPlaying(false); setK(+e.target.value) }} />
             <span className="mono">{frame?.observed_at_utc.slice(0, 10)}</span>
           </div>
-          {area && !tr && <p className="loop-caption">Every photograph of your area, in time order. Click a dot in it to follow that one.</p>}
+          {area && !tr && <p className="loop-caption">Click a dot here to follow it.</p>}
         </div> : <div className="follow-hint"><Icon name="crosshair" size={28} /><p>Your close-up appears here.</p></div>}
       </div>
     </section>
 
     {tr && <aside className="ask follow-results">
       <h2>What the computer measured</h2>
-      {det.length < 5 ? <p className="facts">Only {det.length} photographs show something clear at that spot, too few to measure. Try a brighter dot.</p> : <>
+      {det.length < 5 ? <p className="facts">{saturated
+        ? 'This star is so bright that it saturates the SPHEREx camera: its centre is blank in most photographs, so it cannot be followed. Try a fainter dot.'
+        : `Only ${det.length} photographs show something clear at that spot, too few to measure. Try a brighter dot.`}</p> : <>
         <div className={'measure ' + (moves ? 'yes' : '')}>
           <span className="eyebrow">MOTION</span>
           {m ? <><strong>{moves ? `Moves ${m.total.toFixed(1)}″ per year` : 'No motion we can measure'}</strong>
@@ -155,22 +166,22 @@ export default function FollowStar({ tile }: { tile: Tile }) {
         <div className={'measure ' + (varies ? 'yes' : '')}>
           <span className="eyebrow">BRIGHTNESS</span>
           <strong>{varies ? 'Its brightness changes' : 'Steady brightness'}</strong>
-          {tr.light.length >= 3 && <Scatter points={tr.light} colour={() => '#7ce7d5'} yLabel="brighter (+) or fainter (−) than usual" height={110} />}
+          {tr.light.length >= 3 && <Scatter points={tr.light} colour={() => '#7ce7d5'} yLabel="brighter (+) or fainter (−)" height={78} />}
           <p>{varies ? 'It changes more than the noise does. That can mean a variable star, or a bright star the method could not fully subtract.' : 'Within the noise from one photograph to the next.'}</p>
         </div>
-        <p className="facts">Followed in <b>{tr.detected}</b> of {tr.points.length} photographs over <b>{tr.years.toFixed(1)} years</b>. The dots on the close-up are where it was each time, blue (early) to red (late).</p>
+        <p className="facts">Seen in <b>{tr.detected}</b> of {tr.points.length} photographs over <b>{tr.years.toFixed(1)} years</b>; dots on the close-up go blue (early) to red (late).</p>
       </>}
 
       <h2>What do you think it is?</h2>
       <div className="choices compact">{OPTIONS.map(o => <button key={o.label} className={'choice ' + (label === o.label ? 'chosen' : '')} onClick={() => setLabel(o.label)}>
         <Pictogram label={o.label} /><span><strong>{o.title}</strong></span></button>)}</div>
-      <label className="note">Anything else? (optional)<textarea maxLength={280} rows={2} value={note} onChange={e => setNote(e.target.value)} placeholder="For example: it fades in May, or there is a second dot next to it" /></label>
+      <label className="note">Anything else? (optional)<textarea maxLength={280} rows={1} value={note} onChange={e => setNote(e.target.value)} placeholder="For example: it fades in May, or there is a second dot next to it" /></label>
       <div className="ask-actions">
         <button className="button primary" disabled={!label || sending || !!sent} onClick={send}>{sending ? 'Sending…' : 'Send to the team'} <Icon name="arrow" size={14} /></button>
         <button className="text-button" onClick={() => { setTr(null) }}>Pick another</button>
       </div>
       {sent && <div className="vote-status"><Icon name="check" size={16} />{sent}</div>}
-      <p className="fine-print">Reports go to the team for review and are not shown to other visitors. The position is saved in this field’s pixels.</p>
+      <p className="fine-print">Reports go to the team for review; they are not shown to other visitors.</p>
     </aside>}
 
     {!tr && finds.length > 0 && <aside className="ask">

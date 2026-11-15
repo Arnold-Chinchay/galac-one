@@ -89,3 +89,15 @@ export async function submitReport(r: ReportInput, userId: string): Promise<numb
   if (!response.ok || !body?.ok) throw new DataError(typeof body?.error === 'string' ? body.error : `The report could not be sent (${response.status}).`, 'REPORT_FAILED', response.status)
   return body.reports
 }
+
+export type SkyLabel = 'red' | 'star' | 'glare' | 'nothing'
+export type SkyCounts = Record<string, Record<SkyLabel, number>>
+/** One answer on a source from the automatic sky search; resolves when the server has it. */
+export async function submitSkyVote(v: { source_key: string; ra: number; dec: number; label: SkyLabel }, userId: string, alias?: string): Promise<void> {
+  const response = await fetch(fullUrl(`${API}/sky-votes`), { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId, alias: alias || undefined, votes: [{ ...v, region: v.source_key.split(':')[0] }] }) })
+  const body = await response.json().catch(() => null)
+  if (!response.ok || !body?.ok) throw new DataError(typeof body?.error === 'string' ? body.error : `Not saved (${response.status}).`, 'SKY_VOTE_FAILED', response.status)
+}
+export const skyCounts = (region: string, signal?: AbortSignal): Promise<SkyCounts> =>
+  json<{ counts: SkyCounts }>(fullUrl(`${API}/sky-votes?region=${encodeURIComponent(region)}`), signal).then(r => r.counts ?? {}).catch(() => ({}))

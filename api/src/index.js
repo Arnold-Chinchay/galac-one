@@ -125,6 +125,41 @@ async function postReport(env, request) {
   return json({ ok: true, reports: total.n });
 }
 
+// POST /api/sky-votes { user_id, alias?, votes: [{ source_key, region, ra, dec, label }] } (max 20)
+// GET  /api/sky-votes?region=r6783 -> { counts: { <source_key>: { red, star, glare, nothing } } }
+const SKY_LABELS = new Set(["red", "star", "glare", "nothing"]);
+const SOURCE_KEY = /^r\d{1,6}:-?\d{1,3}\.\d{4}:-?\d{1,2}\.\d{4}$/;
+async function postSkyVotes(env, request) {
+  let b;
+  try { b = await request.json(); } catch { return err(400, "invalid json"); }
+  if (typeof b?.user_id !== "string" || !UUID.test(b.user_id)) return err(400, "user_id must be a uuid");
+  const votes = Array.isArray(b.votes) ? b.votes.slice(0, 20) : [];
+  if (!votes.length) return err(400, "votes must be a non-empty array");
+  for (const v of votes) {
+    if (typeof v?.source_key !== "string" || !SOURCE_KEY.test(v.source_key)) return err(400, "bad source_key");
+    if (!SKY_LABELS.has(v.label)) return err(400, `label must be one of ${[...SKY_LABELS].join(", ")}`);
+    if (!(Number.isFinite(v.ra) && Number.isFinite(v.dec) && Math.abs(v.dec) <= 90)) return err(400, "bad position");
+  }
+  const alias = typeof b.alias === "string" ? b.alias.replace(/[^\w .\-]/g, "").trim().slice(0, 24) || null : null;
+  await env.DB.batch([
+    env.DB.prepare("INSERT OR IGNORE INTO users (id, alias) VALUES (?1, ?2)").bind(b.user_id, alias),
+    ...votes.map((v) => env.DB.prepare(
+      "INSERT OR IGNORE INTO sky_votes (user_id, source_key, region, ra, dec, label) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"
+    ).bind(b.user_id, v.source_key, v.source_key.split(":")[0], v.ra, v.dec, v.label)),
+  ]);
+  return json({ ok: true, accepted: votes.map((v) => v.source_key) });
+}
+async function skyVoteCounts(env, url) {
+  const region = url.searchParams.get("region") || "";
+  if (!/^r\d{1,6}$/.test(region)) return err(400, "region must look like r1234");
+  const { results } = await env.DB.prepare(
+    "SELECT source_key, label, COUNT(*) AS n FROM sky_votes WHERE region = ?1 GROUP BY source_key, label LIMIT 2000"
+  ).bind(region).all();
+  const counts = {};
+  for (const r of results) (counts[r.source_key] ??= { red: 0, star: 0, glare: 0, nothing: 0 })[r.label] = r.n;
+  return json({ region, counts }, 200, { "cache-control": "public, max-age=30" });
+}
+
 async function stats(env) {
   const [a, top] = await env.DB.batch([
     env.DB.prepare(
@@ -137,7 +172,9 @@ async function stats(env) {
   // The reports table arrives with migration 0004; stats keep working without it.
   let reports = null;
   try { reports = (await env.DB.prepare("SELECT COUNT(*) AS n FROM reports").first()).n; } catch { /* not migrated yet */ }
-  return json({ ...a.results[0], reports, leaderboard: top.results });
+  let sky_votes = null;
+  try { sky_votes = (await env.DB.prepare("SELECT COUNT(*) AS n FROM sky_votes").first()).n; } catch { /* not migrated yet */ }
+  return json({ ...a.results[0], reports, sky_votes, leaderboard: top.results });
 }
 
 async function me(env, url) {
@@ -166,6 +203,8 @@ export default {
       if (path === "/api/next") return nextCandidates(env, url);
       if (path === "/api/votes" && request.method === "POST") return postVotes(env, request);
       if (path === "/api/reports" && request.method === "POST") return postReport(env, request);
+      if (path === "/api/sky-votes" && request.method === "POST") return postSkyVotes(env, request);
+      if (path === "/api/sky-votes") return skyVoteCounts(env, url);
       if (path === "/api/stats") return stats(env);
       if (path === "/api/me") return me(env, url);
 

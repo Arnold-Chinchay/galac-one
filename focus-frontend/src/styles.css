@@ -446,3 +446,35 @@ dt{font-size:12px}dd{font-size:14px}
 }
 @media(max-width:900px){.play-bar{gap:8px}.play-modes button{padding:6px 10px;font-size:12px}.field-select span{display:none}.field-select select{font-size:13px;padding:6px 8px;max-width:150px}.score-pill{padding:4px 10px 4px 4px;gap:8px}.rank-badge{width:28px;height:28px;font-size:13px}.score-text small,.xp-bar{display:none}.arena{max-height:48vh}.answer-panel{padding:12px;gap:10px}.play-hint{display:none}}
 @media(max-width:900px){.arena{aspect-ratio:1;max-height:none}.loop-card{width:100%;height:100%}}
+/* Sky hunt */
+.hunt-card{background:#03050a}
+.hunt-card .skymap{margin:0;height:100%}.hunt-card .skymap-canvas{height:100%;border:0;border-radius:0}
+.chip.hot{border-color:#ff6b4a;color:#ffb39f}
+.hunt-legend{position:absolute;left:10px;right:10px;bottom:12px;z-index:2;display:flex;align-items:flex-end;gap:12px;padding:8px 12px;border-radius:12px;background:#05080fd6;border:1px solid #ffffff1a;font-size:11.5px;color:#9fb0c8}
+.redness{display:flex;align-items:flex-end;gap:4px;height:46px;flex:none}
+.redness>div{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:2px}
+.redness i{display:block;width:16px;border-radius:3px 3px 0 0;background:linear-gradient(#ff6b4a,#c2410c)}
+.redness small{font-size:9px;color:#7a8ba6}
+.answer .swatch{width:22px;height:22px;border-radius:50%;flex:none;box-shadow:0 0 12px currentColor}
+.verdict .warn{color:#ffb454}
+@media(max-width:900px){.answer .swatch{width:18px;height:18px}}
+/* Follow a star inside the one-screen game */
+.play-follow{overflow:hidden}
+.play-follow .follow{height:100%;min-height:0}
+.play-follow .follow.has-side{grid-template-columns:minmax(0,1fr) minmax(320px,400px)}
+.play-follow .follow>.stage{height:100%;min-height:0;display:flex;flex-direction:column;padding:14px}
+.play-follow .stage-head strong{font-size:17px}
+.play-follow .follow-grid{flex:1;min-height:0;margin-top:10px;align-items:start}
+.play-follow .follow-grid>div{min-width:0}
+.play-follow .pick,.play-follow .loop.small,.play-follow .follow-hint{width:min(100%,calc(100dvh - 330px));margin:0 auto}
+.play-follow .loop-bar{width:min(100%,calc(100dvh - 330px));margin:8px auto 0}
+.play-follow .loop-caption{font-size:13px;margin:8px auto 0;text-align:center}
+.play-follow .follow-results{height:100%;overflow:auto;padding:14px;gap:8px}
+.play-follow .follow-results h2{font-size:17px;margin:4px 0 8px}
+.play-follow .measure{padding:9px 11px;margin-bottom:8px}
+.play-follow .measure strong{font-size:16px}
+.play-follow .measure p,.play-follow .facts{font-size:12.5px;line-height:1.5;margin-top:4px}
+.play-follow .choices.compact .choice{padding:7px 9px}
+.play-follow .note textarea{min-height:34px}
+@media(max-width:900px){.play-follow{overflow:visible}.play-follow .follow,.play-follow .follow.has-side{height:auto;grid-template-columns:minmax(0,1fr)}
+  .play-follow .pick,.play-follow .loop.small,.play-follow .follow-hint,.play-follow .loop-bar{width:100%}.play-follow .follow-results{height:auto}}
