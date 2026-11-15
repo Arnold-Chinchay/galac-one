@@ -38,7 +38,7 @@ async function findStars(): Promise<{ x: number; y: number; b: number }[]> {
   }
   found.sort((a, b) => b.b - a.b)
   const keep: typeof found = []
-  for (const s of found) if (keep.length < 80 && keep.every(k => Math.hypot(k.x - s.x, k.y - s.y) > 24)) keep.push(s)
+  for (const s of found) if (keep.length < 45 && keep.every(k => Math.hypot(k.x - s.x, k.y - s.y) > 24)) keep.push(s)
   return keep
 }
 
@@ -77,15 +77,13 @@ export default function IntroSky() {
       for (const s of stars) {
         const x = L.ox + s.x * L.s, y = L.oy + s.y * L.s
         if (x < -10 || y < -10 || x > L.W + 10 || y > L.H + 10) continue
-        const a = (still ? 0.25 : 0.5 + 0.5 * Math.sin(t * s.speed + s.phase)) ** 3 * (0.35 + 0.65 * s.b)
-        const r = (1.2 + 2.6 * s.b) * Math.max(0.7, L.s * 1.6)
-        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3)
-        g.addColorStop(0, `rgba(255,246,230,${a})`); g.addColorStop(.35, `rgba(220,230,255,${a * .35})`); g.addColorStop(1, 'rgba(200,215,255,0)')
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 3, 0, Math.PI * 2); ctx.fill()
-        if (s.b > .85 && a > .3) {                        // brightest stars get faint diffraction spikes
-          ctx.strokeStyle = `rgba(235,240,255,${a * .35})`; ctx.lineWidth = .8
-          ctx.beginPath(); ctx.moveTo(x - r * 6, y); ctx.lineTo(x + r * 6, y); ctx.moveTo(x, y - r * 6); ctx.lineTo(x, y + r * 6); ctx.stroke()
-        }
+        // Gentle: a star brightens by at most about a fifth of its own light, about as large as the star in the photo.
+        const a = still ? 0 : 0.22 * (0.5 + 0.5 * Math.sin(t * s.speed + s.phase)) ** 2 * s.b
+        if (a < 0.01) continue
+        const r = (0.9 + 1.3 * s.b) * Math.max(0.6, L.s * 1.2)
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 2)
+        g.addColorStop(0, `rgba(255,248,235,${a})`); g.addColorStop(.5, `rgba(225,232,255,${a * .25})`); g.addColorStop(1, 'rgba(200,215,255,0)')
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 2, 0, Math.PI * 2); ctx.fill()
       }
       // A faint object crossing slowly, every half minute or so: the kind of thing the site hunts for.
       if (!still) {
@@ -112,7 +110,7 @@ export default function IntroSky() {
 
     findStars().then(found => {
       if (stop) return
-      for (const s of found) stars.push({ ...s, phase: Math.random() * Math.PI * 2, speed: 0.6 + Math.random() * 1.8 })
+      for (const s of found) stars.push({ ...s, phase: Math.random() * Math.PI * 2, speed: 0.4 + Math.random() * 1.1 })
       raf = requestAnimationFrame(draw)
     }).catch(() => {})
 
