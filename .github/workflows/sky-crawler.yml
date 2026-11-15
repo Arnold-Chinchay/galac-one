@@ -1,14 +1,15 @@
-# Grows the deep-sky layer on its own: every few hours it stacks the next regions (new NASA frames first, then new sky).
+# Grows the deep-sky layer on its own: every 2 h it stacks the next regions (new NASA frames first, then new sky along the ecliptic).
+# 19 regions at a time leaves one of the 20 free concurrent jobs for plan and publish.
 name: sky-crawler
 
 on:
   schedule:
-    - cron: "17 */4 * * *"
+    - cron: "17 */2 * * *"
   workflow_dispatch:
     inputs:
       regions:
         description: "How many regions this run"
-        default: "30"
+        default: "38"
 
 permissions:
   contents: read
@@ -43,7 +44,7 @@ jobs:
           except Exception as e: print("no state yet:", e)'
       - id: m
         run: |
-          python -m pipeline.sky_queue plan --index cache/merged/*.csv.gz --state state.json --k ${{ inputs.regions || 30 }} --out plan.json
+          python -m pipeline.sky_queue plan --index cache/merged/*.csv.gz --state state.json --k ${{ inputs.regions || 38 }} --out plan.json
           python -c 'import json; p = json.load(open("plan.json")); print("matrix=" + json.dumps({"r": p})); print(f"count={len(p)}")' >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with: { name: plan, path: plan.json, retention-days: 3 }
@@ -55,7 +56,7 @@ jobs:
     timeout-minutes: 330
     strategy:
       fail-fast: false
-      max-parallel: 16
+      max-parallel: 19
       matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
     env:
       GH_TOKEN: ${{ github.token }}
