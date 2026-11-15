@@ -13,6 +13,7 @@ import FrameCanvas from '../components/FrameCanvas'
 import Pictogram from '../components/Pictogram'
 import FollowStar from '../components/FollowStar'
 import SkyHunt from '../components/SkyHunt'
+import FieldPicker from '../components/FieldPicker'
 
 const CHOICES: { label: Label; title: string; hint: string }[] = [
   { label: 'moving', title: 'It moves', hint: 'Changes place over time' },
@@ -171,13 +172,7 @@ export default function ClassifyPage(p: Props) {
         <button role="tab" aria-selected={mode === 'follow'} className={mode === 'follow' ? 'active' : ''} onClick={() => setMode('follow')}>Follow a star</button>
         <button role="tab" aria-selected={mode === 'hunt'} className={mode === 'hunt' ? 'active' : ''} onClick={() => setMode('hunt')}>Sky hunt</button>
       </div>
-      {mode !== 'hunt' && <label className="field-select"><span>Field</span>
-        <select value={training ? '__practice' : tile.manifest.tile_id} onChange={e => { if (e.target.value === '__practice') p.onTraining(); else { const t = fields.find(x => x.tile_id === e.target.value); if (t) p.onField(t) } }}>
-          <option value="__practice">Practice (answers shown)</option>
-          <optgroup label="Challenge fields">{fields.filter(t => !t.tile_id.startsWith('sky')).map(t => <option key={t.tile_id} value={t.tile_id}>{t.title}</option>)}</optgroup>
-          {fields.some(t => t.tile_id.startsWith('sky')) && <optgroup label="New from the sky search">
-            {fields.filter(t => t.tile_id.startsWith('sky')).map(t => <option key={t.tile_id} value={t.tile_id}>{t.title}</option>)}</optgroup>}
-        </select></label>}
+      {mode !== 'hunt' && <FieldPicker fields={fields} current={training ? null : tile.manifest.tile_id} onPractice={() => p.onTraining()} onPick={f => p.onField(f)} />}
       <button className="score-pill" onClick={() => setProfile(v => !v)} aria-expanded={profile} title="Your rank, badges and the leaderboard">
         <span className="rank-badge">{rank.level}</span>
         <span className="score-text"><strong>{rank.name}</strong><small>{game.xp} pts{rank.to ? ` · ${rank.to - game.xp} to ${rank.nextName}` : ''}</small><i className="xp-bar"><b style={{ width: `${rank.progress * 100}%` }} /></i></span>
