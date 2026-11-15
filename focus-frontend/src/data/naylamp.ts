@@ -134,7 +134,7 @@ export async function submitNaylampVotes(api: string, votes: Vote[], signal?: Ab
   const post = async (batch: Vote[]) => {
     const response = await fetch(`${api}/votes`, {
       method: 'POST', signal, headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: batch[0].user_id, votes: batch.map(v => ({ candidate_id: v.candidate_id, label: v.label })) }),
+      body: JSON.stringify({ user_id: batch[0].user_id, alias: leaderboardName(), votes: batch.map(v => ({ candidate_id: v.candidate_id, label: v.label })) }),
     })
     const body = await response.json().catch(() => null)
     const ok = response.ok && body?.ok === true && body.ignored === 0
@@ -163,4 +163,13 @@ export async function fetchUserStats(api: string, userId: string, signal?: Abort
   if (!response.ok) return null
   const body = await response.json().catch(() => null)
   return body && typeof body.n_votes === 'number' ? { n_votes: body.n_votes, reliability: body.reliability ?? null } : null
+}
+
+/** The name chosen for the leaderboard in Classify (lib/game.ts), sent with votes; the Worker cleans it again. */
+function leaderboardName(): string | undefined {
+  try {
+    const raw = globalThis.localStorage?.getItem('galac.game.v1')
+    const alias = raw ? String(JSON.parse(raw).alias ?? '').trim().slice(0, 24) : ''
+    return alias || undefined
+  } catch { return undefined }
 }
