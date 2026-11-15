@@ -16,6 +16,7 @@ import Explain from './components/Explain';
 import Home, { Intro } from './pages/Home';
 import Method from './pages/Method';
 import ClassifyPage from './pages/Classify';
+import CelestialBackdrop from './components/CelestialBackdrop';
 
 type Page = 'home'|'sky'|'explore'|'classify'|'method';
 const pages:Page[]=['sky','classify','method'];
@@ -106,6 +107,7 @@ export default function App(){
   {page==='home'&&<Intro onEnter={()=>navigate('sky')} onTraining={openTraining}/>}
   {page==='sky'&&<Home targets={targets} community={community} onOpen={t=>openTarget(t)} onClassify={t=>t?openTarget(t,'classify'):navigate('classify')} onTraining={openTraining}/>}
   {(page==='explore'||page==='classify')&&<div className={'workspace '+(expanded?'expanded':'')}>
+   {page==='classify'&&<CelestialBackdrop variant="classify"/>}
    <div className="workspace-heading"><div>{page==='classify'?<span className="eyebrow">{training?'TRAINING · ANSWERS SHOWN':'CITIZEN SCIENCE · YOUR VOTE COUNTS'}</span>:<button className="text-button back-to-sky" onClick={()=>navigate('sky')}><Icon name="back" size={15}/>Back to the sky</button>}<h1>{page==='classify'?'What do you see?':tile?.manifest.title??'Loading…'}</h1></div><div className="workspace-actions">{statusBadge}<button className="button secondary compact" onClick={share}><Icon name="share" size={15}/>Share</button></div></div>
    {page==='explore'&&<div className="field-bar"><label>Field<select value={tile?.manifest.tile_id??''} onChange={e=>{const t=targets.find(x=>x.tile_id===e.target.value);if(t)openTarget(t)}}>{!tile&&<option value="">Choose a field…</option>}{targets.filter(t=>t.status==='ready').map(t=><option key={t.tile_id} value={t.tile_id}>{t.title}</option>)}</select></label>{tile&&<p>{targets.find(t=>t.tile_id===tile.manifest.tile_id)?.description}</p>}</div>}
    {formError&&<p role="alert" className="error-line"><Icon name="artifact" size={16}/>{formError}</p>}

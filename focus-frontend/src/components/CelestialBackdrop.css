@@ -1,0 +1,189 @@
+/* Decorative silhouettes float over the existing background without replacing it. */
+.celestial-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+.celestial-backdrop > svg {
+  position: absolute;
+  display: block;
+  height: auto;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.celestial-backdrop .celestial-stars {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: .45;
+}
+
+.celestial-backdrop .celestial-star {
+  fill: #b1cee4;
+  opacity: .45;
+}
+
+.celestial-backdrop .celestial-star--glint {
+  animation: celestial-glint 9s ease-in-out infinite alternate;
+}
+
+.celestial-backdrop .celestial-star-cross {
+  stroke: #b1cee4;
+  stroke-width: .7;
+  opacity: .18;
+}
+
+.celestial-backdrop--classify {
+  position: fixed;
+  z-index: -1;
+}
+
+.celestial-backdrop--classify .celestial-planet {
+  width: clamp(360px, 47vw, 760px);
+  top: -3%;
+  right: -15%;
+  opacity: .3;
+  transform: rotate(-14deg);
+  filter: blur(1.5px);
+}
+
+.celestial-backdrop--classify .celestial-comet {
+  width: clamp(160px, 24vw, 360px);
+  top: 38%;
+  left: -3%;
+  opacity: .32;
+  transform: rotate(-22deg);
+  animation: celestial-comet-drift 70s ease-in-out infinite alternate;
+}
+
+.celestial-backdrop--about .celestial-stars {
+  opacity: .28;
+}
+
+.celestial-backdrop--about .celestial-galaxy--spiral {
+  top: 3%;
+  right: -15%;
+  width: clamp(460px, 57vw, 900px);
+  opacity: .4;
+  transform: translateY(0) rotate(8deg);
+  filter: blur(1.3px);
+}
+
+.celestial-backdrop--about .celestial-galaxy--edge {
+  top: 48%;
+  left: -20%;
+  width: clamp(620px, 75vw, 1200px);
+  opacity: .32;
+  transform: translateY(0) rotate(-6deg);
+  filter: blur(1.3px);
+}
+
+.celestial-backdrop--about .celestial-system {
+  right: -18%;
+  bottom: -12%;
+  width: clamp(480px, 58vw, 900px);
+  opacity: .2;
+  transform: rotate(8deg);
+  filter: blur(1px);
+}
+
+@supports (animation-timeline: scroll()) {
+  .celestial-backdrop--about .celestial-galaxy--spiral {
+    animation: celestial-spiral-scroll linear both;
+    animation-timeline: scroll(root block);
+  }
+
+  .celestial-backdrop--about .celestial-galaxy--edge {
+    animation: celestial-edge-scroll linear both;
+    animation-timeline: scroll(root block);
+  }
+
+  .celestial-backdrop--about .celestial-system {
+    animation: celestial-system-scroll linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+
+@keyframes celestial-glint {
+  from { opacity: .15; }
+  to { opacity: .8; }
+}
+
+@keyframes celestial-comet-drift {
+  from { transform: translate(-25px, 12px) rotate(-22deg); opacity: .16; }
+  to { transform: translate(140px, -55px) rotate(-22deg); opacity: .42; }
+}
+
+@keyframes celestial-spiral-scroll {
+  0% { opacity: .38; transform: translateY(0) rotate(8deg); }
+  30% { opacity: .5; }
+  65% { opacity: .13; }
+  100% { opacity: .08; transform: translateY(-110px) rotate(21deg); }
+}
+
+@keyframes celestial-edge-scroll {
+  0% { opacity: .09; transform: translateY(110px) rotate(-6deg); }
+  40% { opacity: .42; }
+  75% { opacity: .37; }
+  100% { opacity: .16; transform: translateY(-110px) rotate(1deg); }
+}
+
+@keyframes celestial-system-scroll {
+  0% { opacity: .025; transform: translateY(100px) rotate(8deg); }
+  35% { opacity: .08; }
+  75% { opacity: .24; }
+  100% { opacity: .32; transform: translateY(-25px) rotate(-9deg); }
+}
+
+@media (max-width: 700px) {
+  .celestial-backdrop--classify .celestial-planet {
+    width: 400px;
+    top: 7%;
+    right: -235px;
+    opacity: .24;
+  }
+
+  .celestial-backdrop--classify .celestial-comet {
+    top: 57%;
+    left: -80px;
+    width: 230px;
+    animation: none;
+    opacity: .24;
+  }
+
+  .celestial-backdrop--about .celestial-galaxy--spiral {
+    width: 510px;
+    right: -300px;
+    top: 12%;
+  }
+
+  .celestial-backdrop--about .celestial-galaxy--edge {
+    width: 660px;
+    left: -330px;
+    top: 47%;
+  }
+
+  .celestial-backdrop--about .celestial-system {
+    width: 520px;
+    right: -335px;
+    bottom: 1%;
+  }
+
+  .celestial-backdrop .celestial-star--glint {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .celestial-backdrop .celestial-star--glint,
+  .celestial-backdrop--classify .celestial-comet,
+  .celestial-backdrop--about .celestial-galaxy--spiral,
+  .celestial-backdrop--about .celestial-galaxy--edge,
+  .celestial-backdrop--about .celestial-system {
+    animation: none;
+  }
+}

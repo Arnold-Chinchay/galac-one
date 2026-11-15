@@ -14,12 +14,14 @@ export function Intro({ onEnter, onTraining }: IntroProps) {
   return <section className="brand-hero">
     <IntroSky />
     <div className="brand-hero-copy">
-      <Logo className="brand-logo" />
-      <p>Find what moves and what changes in the infrared sky, with NASA’s SPHEREx telescope and your eyes.</p>
+      <span className="eyebrow brand-hero-eyebrow"><i aria-hidden="true" />A new perspective on the night sky</span>
+      <h1 className="brand-hero-title"><Logo className="brand-logo" /></h1>
+      <p>Explore the infrared sky with NASA’s SPHEREx telescope. Help discover what moves and what changes.</p>
       <div className="brand-hero-actions">
         <button className="button primary large" onClick={onEnter}>Enter the sky <Icon name="arrow" size={18} /></button>
-        <button className="text-button" onClick={onTraining}>Practice first</button>
+        <button className="button secondary large" onClick={onTraining}><Icon name="play" size={15} />Practice first</button>
       </div>
+      <span className="brand-hero-invitation">Your eyes. A different kind of discovery.</span>
     </div>
     <small className="brand-hero-credit">Artist’s concept of a distant planet, not SPHEREx data. Image: Caltech/R. Hurt (IPAC).</small>
   </section>

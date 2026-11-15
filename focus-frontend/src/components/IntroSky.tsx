@@ -7,12 +7,17 @@ const IMG_W = 1900, IMG_H = 1124            // size of planet-x.jpg
 const PX = 776, PY = 462, PR = 352          // planet centre and radius in that image
 const SUN = { x: 1430, y: 735, r: 70 }      // the bright distant sun: left out of the twinkle
 const FIT = 0.8                             // the planet fills 80% of its canvas; the rest is halo
+const PLANET_DROP = 96 / 2.54                // 1 cm in CSS pixels, independent of the image scale
 
-/** Where the image sits inside the hero: background-size cover, background-position from CSS. */
+/** Keep the photograph, stars and 3D planet aligned, 1 cm below the vertical centre. */
 function layout(hero: HTMLElement) {
   const W = hero.clientWidth, H = hero.clientHeight, s = Math.max(W / IMG_W, H / IMG_H)
-  const [fx, fy] = getComputedStyle(hero).backgroundPosition.split(' ').map(v => v.endsWith('%') ? parseFloat(v) / 100 : 0.5)
-  return { W, H, s, ox: (W - IMG_W * s) * fx, oy: (H - IMG_H * s) * fy }
+  const positionX = getComputedStyle(hero).backgroundPositionX
+  const fx = positionX.endsWith('%') ? parseFloat(positionX) / 100 : 0.5
+  const oy = H / 2 - PY * s + PLANET_DROP
+  hero.style.backgroundPositionY = `${oy}px`
+  hero.style.setProperty('--hero-background-top', `${Math.max(0, oy)}px`)
+  return { W, H, s, ox: (W - IMG_W * s) * fx, oy }
 }
 
 /** Bright stars of the illustration: local maxima of brightness away from the planet and the sun. */

@@ -1,5 +1,8 @@
 import type { CommunityStats } from '../data/types'
 import { Icon } from '../components/Icons'
+import CelestialBackdrop from '../components/CelestialBackdrop'
+import MethodDiagram from './MethodDiagrams'
+import './Method.css'
 
 const results = [
   ['Barnard’s Star', 'Proper motion 10.10 ± 0.12 ″/yr', 'Gaia DR3: 10.39 ″/yr (−2.9%, direction within 0.3°). The star saturates, so the centroid uses its wings.'],
@@ -31,45 +34,59 @@ const openData: [string, string, string][] = [
 
 export default function Method({ community, onClassify }: { community: CommunityStats | null; onClassify: () => void }) {
   return <div className="credits-page">
-    <span className="eyebrow">METHOD, RESULTS AND LIMITS</span>
-    <h1>Remove the colour.<br />Keep the change.</h1>
-    <p className="credits-intro">SPHEREx images the sky through a filter whose colour varies across the detector. The same star is seen at a different wavelength on every visit, so two images of one field never match, and ordinary image subtraction fails. That is the obstacle between SPHEREx and a search for moving objects.</p>
+    <div className="about-atmosphere" aria-hidden="true"><span className="about-nebula" /><span className="about-starlight" /><span className="about-horizon" /><CelestialBackdrop variant="about" /></div>
+    <header className="about-hero">
+      <div className="about-hero-copy">
+        <span className="eyebrow about-eyebrow"><span />METHOD, RESULTS AND LIMITS</span>
+        <h1>Remove the colour.<br /><em>Keep the change.</em></h1>
+        <p className="credits-intro">SPHEREx images the sky through a filter whose colour varies across the detector. The same star is seen at a different wavelength on every visit, so two images of one field never match, and ordinary image subtraction fails. That is the obstacle between SPHEREx and a search for moving objects.</p>
+      </div>
+      <div className="about-orbit" aria-hidden="true">
+        <span className="about-orbit-label mono">A DIFFERENT VIEW OF THE SKY</span>
+        <div className="about-orbit-drawing"><i /><i /><i /><b /><span /></div>
+        <div className="about-orbit-caption"><strong>4.5<span>×</span></strong><p>less frame-to-frame scatter<br />after spectral subtraction</p></div>
+      </div>
+    </header>
+    <section className="about-method" aria-labelledby="method-heading">
+    <div className="about-section-heading"><span className="eyebrow">01 / THE METHOD</span><h2 id="method-heading">How the search works</h2></div>
     <div className="credits-grid">
-      <article><span className="mono">01 / SPECTRAL SUBTRACTION</span><h2>A spectrum for every pixel.</h2><p>For each pixel we fit a smooth spectrum through all its visits, with one brightness scale per frame, and subtract it at each frame’s wavelength. On real stars the frame-to-frame scatter drops by a factor of 4.5; frames taken at the same wavelength went from 46% apart to 10%.</p></article>
-      <article><span className="mono">02 / DETECTION</span><h2>Lines and repeats.</h2><p>Peaks in the residual frames are linked into straight tracks (moving objects) or repeats at one position (variable sources). Every field also receives synthetic moving objects, so its sensitivity is measured, not assumed.</p></article>
-      <article><span className="mono">03 / PEOPLE</span><h2>A calibrated crowd.</h2><p>Each volunteer’s queue mixes real candidates with hidden test objects and empty-sky controls. Their answers on those give a reliability score. In our test, someone who marks everything as moving scores 0.58; someone who answers correctly scores 0.92.</p></article>
-      <article><span className="mono">04 / COLD OBJECTS</span><h2>The Planet X case.</h2><p>A distant cold body is faint, very red and slow. We search wider fields for sources far redder than the stars, test their spectrum band by band, and test their motion against random splits of the frames.</p></article>
+      <article><span className="mono">01 / SPECTRAL SUBTRACTION</span><h2>A spectrum for every pixel.</h2><MethodDiagram kind="spectrum" /><p>For each pixel we fit a smooth spectrum through all its visits, with one brightness scale per frame, and subtract it at each frame’s wavelength. On real stars the frame-to-frame scatter drops by a factor of 4.5; frames taken at the same wavelength went from 46% apart to 10%.</p></article>
+      <article><span className="mono">02 / DETECTION</span><h2>Lines and repeats.</h2><MethodDiagram kind="detection" /><p>Peaks in the residual frames are linked into straight tracks (moving objects) or repeats at one position (variable sources). Every field also receives synthetic moving objects, so its sensitivity is measured, not assumed.</p></article>
+      <article><span className="mono">03 / PEOPLE</span><h2>A calibrated crowd.</h2><MethodDiagram kind="crowd" /><p>Each volunteer’s queue mixes real candidates with hidden test objects and empty-sky controls. Their answers on those give a reliability score. In our test, someone who marks everything as moving scores 0.58; someone who answers correctly scores 0.92.</p></article>
+      <article><span className="mono">04 / COLD OBJECTS</span><h2>The Planet X case.</h2><MethodDiagram kind="cold" /><p>A distant cold body is faint, very red and slow. We search wider fields for sources far redder than the stars, test their spectrum band by band, and test their motion against random splits of the frames.</p></article>
     </div>
-    <section className="sources-section"><h2>What we measured</h2>
-      <div className="sources-list results-list">{results.map(([name, value, note]) => <div key={name}><div><strong>{name} · {value}</strong><p>{note}</p></div></div>)}</div>
-      <p>All of these come from SPHEREx frames alone; Gaia is used only as the reference to compare against.</p>
     </section>
-    <section className="sources-section"><h2>Limits we know about</h2>
+    <section className="sources-section about-results"><div className="about-section-heading"><span className="eyebrow">02 / THE EVIDENCE</span><h2>What we measured</h2></div>
+      <p className="about-section-intro">All of these come from SPHEREx frames alone; Gaia is used only as the reference to compare against.</p>
+      <div className="sources-list about-results-list">{results.map(([name, value, note], index) => <article key={name} className="about-result"><span className="about-result-index mono">{String(index + 1).padStart(2, '0')}</span><div className="about-result-title"><h3>{name}</h3><strong>{value}</strong></div><p>{note}</p></article>)}</div>
+    </section>
+    <section className="sources-section about-limits"><div className="about-section-heading"><span className="eyebrow">03 / THE CONTEXT</span><h2>Limits we know about</h2></div>
       <ul className="limits-list">{limits.map(l => <li key={l}>{l}</li>)}</ul>
     </section>
-    <section className="sources-section"><h2>The crowd so far</h2>
+    <section className="sources-section about-community"><div className="about-section-heading"><span className="eyebrow">04 / THE PEOPLE</span><h2>The crowd so far</h2></div>
       <div className="stat-row">
         <div><strong>{community?.users ?? '—'}</strong><span>volunteers</span></div>
         <div><strong>{community?.votes ?? '—'}</strong><span>classifications</span></div>
         <div><strong>{community?.candidates ?? '—'}</strong><span>candidates</span></div>
         <div><strong>{community?.tiles ?? '—'}</strong><span>fields</span></div>
       </div>
-      {community?.leaderboard?.length ? <table className="result-table board"><thead><tr><th>Volunteer</th><th>Classifications</th><th>Reliability</th></tr></thead><tbody>{community.leaderboard.map((u, i) => <tr key={i}><td>{u.alias}</td><td>{u.n_votes}</td><td>{u.reliability === null ? '—' : Math.round(u.reliability * 100) + '%'}</td></tr>)}</tbody></table> : null}
+      {community?.leaderboard?.length ? <div className="about-table-scroll"><table className="result-table board"><thead><tr><th>Volunteer</th><th>Classifications</th><th>Reliability</th></tr></thead><tbody>{community.leaderboard.map((u, i) => <tr key={i}><td>{u.alias}</td><td>{u.n_votes}</td><td>{u.reliability === null ? '—' : Math.round(u.reliability * 100) + '%'}</td></tr>)}</tbody></table></div> : null}
       <button className="button primary" onClick={onClassify}>Add your classifications <Icon name="arrow" size={16} /></button>
     </section>
-    <section className="sources-section"><h2>Open data</h2>
+    <section className="sources-section about-open-data"><div className="about-section-heading"><span className="eyebrow">05 / EXPLORE THE DATA</span><h2>Open to everyone.</h2></div>
       <p>Everything on this site can be downloaded and checked. Deep images are FITS with a sky coordinate system (WCS); frame cubes are float16 with a JSON manifest; measurements and candidate lists are JSON.</p>
-      <div className="open-data">
-        <div className="open-data-row head"><span>Field</span><span>Candidates and votes</span><span>Deep image</span><span>Frames</span><span>Measurement</span></div>
-        {openData.map(([id, title, measure]) => <div key={id} className="open-data-row"><strong>{title}</strong>
-          <a href={`/api/tiles/${id}/candidates`} target="_blank" rel="noreferrer">JSON</a>
-          <span><a href={`/tiles/${id}/deep/deep_lum.fits`}>FITS</a> · <a href={`/tiles/${id}/deep/deep_rgb.png`} target="_blank" rel="noreferrer">PNG</a></span>
-          <a href={`/tiles/${id}/manifest.json`} target="_blank" rel="noreferrer">manifest</a>
-          <a href={`/tiles/${id}/${measure}`} target="_blank" rel="noreferrer">{measure.replace('.json', '')}</a></div>)}
-      </div>
+      <div className="about-table-scroll"><table className="open-data about-data-table">
+        <caption className="about-visually-hidden">Open data downloads for each SPHEREx field</caption>
+        <thead><tr><th scope="col">Field</th><th scope="col">Candidates & votes</th><th scope="col">Deep image</th><th scope="col">Frames</th><th scope="col">Measurement</th></tr></thead>
+        <tbody>{openData.map(([id, title, measure]) => <tr key={id}><th scope="row">{title}</th>
+          <td><a href={`/api/tiles/${id}/candidates`} target="_blank" rel="noreferrer">JSON <Icon name="external" size={12} /></a></td>
+          <td><span className="about-download-pair"><a href={`/tiles/${id}/deep/deep_lum.fits`}>FITS</a><a href={`/tiles/${id}/deep/deep_rgb.png`} target="_blank" rel="noreferrer">PNG</a></span></td>
+          <td><a href={`/tiles/${id}/manifest.json`} target="_blank" rel="noreferrer">manifest <Icon name="external" size={12} /></a></td>
+          <td><a href={`/tiles/${id}/${measure}`} target="_blank" rel="noreferrer">{measure.replace('.json', '')} <Icon name="external" size={12} /></a></td></tr>)}</tbody>
+      </table></div>
       <p>API: <code>/api/tiles</code> lists the fields, <code>/api/tiles/&lt;id&gt;/candidates</code> gives every candidate with its track and vote counts, <code>/api/stats</code> the totals. Hidden test objects are mixed into the candidate lists on purpose; which ones they are stays private so that reliability scores remain valid.</p>
     </section>
-    <section className="sources-section"><h2>Data and tools</h2>
+    <section className="sources-section about-sources"><div className="about-section-heading"><span className="eyebrow">06 / SOURCES & CREDITS</span><h2>Data and tools</h2></div>
       <div className="sources-list">{sources.map(([title, description, url]) => <a key={title} href={url} target="_blank" rel="noreferrer"><div><strong>{title}</strong><p>{description}</p></div><Icon name="external" size={18} /></a>)}</div>
       <p>Site built with React, TypeScript and Vite, served with the API from Cloudflare Workers, D1 and R2. Typography: Jost, Geist, Inter and IBM Plex Mono (SIL Open Font License). Title-screen planet: artist’s concept, Caltech/R. Hurt (IPAC); it is an illustration, not an observation. Naylamp Space is an independent team from Piura, Peru; this is not an official NASA or IRSA product.</p>
     </section>

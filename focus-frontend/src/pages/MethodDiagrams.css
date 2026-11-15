@@ -1,0 +1,120 @@
+.page-credits .method-diagram {
+  margin: 20px 0 23px;
+  border: 1px solid #91b5cc21;
+  border-radius: 9px;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 65% 20%, #79b8d209, transparent 74%), #08142177;
+}
+
+.page-credits .method-diagram > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.page-credits .method-diagram text {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 400;
+}
+
+.page-credits .method-diagram .diagram-label { fill: #b2c7d6; font-size: 12px; letter-spacing: .8px; }
+.page-credits .method-diagram .diagram-note { fill: #9eb5c6; font-size: 12px; letter-spacing: -.15px; }
+.page-credits .method-diagram .diagram-card-label { fill: #c0d2dc; font-size: 12px; }
+.page-credits .method-diagram .diagram-grid { fill: none; stroke: #96b9d111; stroke-width: 1; }
+.page-credits .method-diagram .diagram-axis { fill: none; stroke: #96b9d140; stroke-width: 1; }
+.page-credits .method-diagram .diagram-arrow { fill: none; stroke: #98becb99; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.page-credits .method-diagram .diagram-field { fill: #0b1925; stroke: #91b5cc2e; }
+.page-credits .method-diagram .diagram-field-stars { fill: #c3d6e26e; }
+
+.page-credits .method-diagram figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin: 0;
+  padding: 11px 15px 12px;
+  border-top: 1px solid #91b5cc17;
+  background: #a2c6d605;
+  color: #b0c6d1;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.page-credits .method-diagram figcaption > span:first-child {
+  color: #8eaab9;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+
+.page-credits .diagram-fit { fill: none; stroke: #91dacd; stroke-width: 2; stroke-linecap: round; }
+.page-credits .diagram-fit-echo { fill: none; stroke: #e5f9ee; stroke-width: 2.3; stroke-linecap: round; stroke-dasharray: 28 300; animation: method-spectrum-trace 9s linear infinite; }
+.page-credits .diagram-observations { stroke: #0b1823; stroke-width: 2; }
+.page-credits .diagram-residual { fill: none; stroke: #8cb9cc88; stroke-width: 1.5; }
+.page-credits .diagram-residual-signal { fill: none; stroke: #b6ddd2; stroke-width: 1.8; }
+.page-credits .diagram-signal-glow { fill: #d1eadc; filter: drop-shadow(0 0 5px #a4dfc888); animation: method-signal-breathe 7s ease-in-out infinite; }
+
+.page-credits .diagram-track { fill: none; stroke: #8fcdd077; stroke-width: 1.3; stroke-dasharray: 3 5; }
+.page-credits .diagram-detections { fill: #8bdacb; stroke: #b5f2e35c; stroke-width: 1; }
+.page-credits .diagram-moving-signal { fill: #e2f7ee; filter: drop-shadow(0 0 4px #c2f5e4aa); animation: method-source-travel 10s ease-in-out infinite; }
+.page-credits .diagram-variable-halo { fill: #cdb58c0d; stroke: #d8bc951a; stroke-width: 1; }
+.page-credits .diagram-variable-ring { fill: #ddbd9514; stroke: #ddbd9566; stroke-width: 1; animation: method-variable-breathe 8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.page-credits .diagram-variable-core { fill: #e3c7a0; filter: drop-shadow(0 0 6px #e3c7a099); animation: method-signal-breathe 8s ease-in-out infinite; }
+
+.page-credits .diagram-queue-card { fill: #152634; stroke: #9bbac830; }
+.page-credits .diagram-real-dot { fill: #96d6d4; }
+.page-credits .diagram-test-symbol { fill: none; stroke: #d4ba90; stroke-width: 1.7; stroke-linecap: round; }
+.page-credits .diagram-control-symbol { fill: none; stroke: #9bb2c1; stroke-width: 1; stroke-dasharray: 2 2; }
+.page-credits .diagram-connections { fill: none; stroke: #9cbec239; stroke-width: 1; }
+.page-credits .diagram-answer-flow { fill: none; stroke: #96dfd0aa; stroke-width: 1.6; stroke-dasharray: 9 95; animation: method-answer-travel 8s linear infinite; }
+.page-credits .diagram-volunteer > circle:first-child { fill: #132a36; stroke: #86b7c35c; stroke-width: 1; }
+.page-credits .diagram-volunteer > circle:nth-child(2) { fill: #b5d2d8; }
+.page-credits .diagram-volunteer > path { fill: none; stroke: #b5d2d8; stroke-width: 1.5; stroke-linecap: round; }
+.page-credits .diagram-calibration-ring { fill: #172d350f; stroke: #96dfd022; stroke-width: 4; }
+.page-credits .diagram-calibration-arc { fill: none; stroke: #96dfd088; stroke-width: 2; stroke-linecap: round; }
+.page-credits .diagram-calibration-check { fill: none; stroke: #b4e5d8; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.page-credits .diagram-cold-orbit { fill: none; stroke: #b0c7d32e; stroke-width: 1; stroke-dasharray: 3 6; }
+.page-credits .diagram-cold-object { animation: method-cold-drift 12s ease-in-out infinite; }
+.page-credits .diagram-cold-rim { fill: none; stroke: #9abbd199; stroke-width: 1.2; }
+.page-credits .diagram-slow-trail { fill: none; stroke: #d7b38d55; stroke-width: 1; stroke-dasharray: 2 4; }
+.page-credits .diagram-cold-traveller { fill: #e1bd91; filter: drop-shadow(0 0 4px #e1bd9155); animation: method-slow-travel 12s ease-in-out infinite; }
+
+@keyframes method-spectrum-trace {
+  0%, 10% { stroke-dashoffset: 36; opacity: 0; }
+  18%, 65% { opacity: .8; }
+  80%, 100% { stroke-dashoffset: -280; opacity: 0; }
+}
+
+@keyframes method-signal-breathe { 0%, 100% { opacity: .6; } 50% { opacity: 1; } }
+@keyframes method-source-travel {
+  0%, 10% { transform: translate(0, 0); opacity: 0; }
+  18% { opacity: 1; }
+  72% { transform: translate(117px, -64px); opacity: 1; }
+  80%, 100% { transform: translate(117px, -64px); opacity: 0; }
+}
+@keyframes method-variable-breathe { 0%, 100% { opacity: .45; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.12); } }
+@keyframes method-answer-travel { from { stroke-dashoffset: 18; } to { stroke-dashoffset: -190; } }
+@keyframes method-cold-drift { 0%, 100% { transform: translate(-2px, 1px); } 50% { transform: translate(2px, -1px); } }
+@keyframes method-slow-travel { 0%, 100% { transform: translate(-4px, 3px); opacity: .6; } 50% { transform: translate(4px, -3px); opacity: 1; } }
+
+@media (max-width: 760px) {
+  .page-credits .method-diagram { margin: 18px 0 21px; }
+  .page-credits .method-diagram figcaption { padding: 10px 13px; font-size: 11px; gap: 4px 10px; }
+}
+
+@media (max-width: 450px) {
+  .page-credits .method-diagram .diagram-label { font-size: 14px; letter-spacing: .5px; }
+  .page-credits .method-diagram .diagram-note { font-size: 13px; }
+  .page-credits .method-diagram .diagram-card-label { font-size: 13px; }
+  .page-credits .method-diagram figcaption { font-size: 12px; }
+  .page-credits .method-diagram figcaption > span:first-child { font-size: 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-credits .method-diagram *,
+  .page-credits .method-diagram *::before,
+  .page-credits .method-diagram *::after { animation: none; }
+  .page-credits .diagram-fit-echo { opacity: 0; }
+}

@@ -1,0 +1,331 @@
+/* Shared presentation and the title screen. Scientific views keep their own styles. */
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.app .site-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 32px;
+  height: 88px;
+  padding: 0 5.5%;
+  border-bottom: 1px solid #b8d7ff12;
+  background: #080f1bd9;
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.app .site-header .brand {
+  justify-self: start;
+  gap: 17px;
+}
+
+.app .site-header .brand .wordmark {
+  height: 27px;
+  width: auto;
+}
+
+.app .site-header .brand > small {
+  font-size: 8px;
+  line-height: 1.7;
+  letter-spacing: 1.7px;
+  color: #b3c3d7;
+  margin: 3px 0 0;
+}
+
+.app .site-header nav {
+  align-self: center;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.app .site-header nav a {
+  min-height: 42px;
+  padding: 0 17px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -.15px;
+  color: #c1cedf;
+  transition: color .2s ease, background .2s ease, border-color .2s ease;
+}
+
+.app .site-header nav a:hover {
+  background: #b3cfff0b;
+  color: #f5f8ff;
+}
+
+.app .site-header nav a[aria-current] {
+  background: #7ce7d510;
+  border-color: #7ce7d526;
+  color: #a0f1e3;
+}
+
+.app .site-header nav a[aria-current]::after {
+  display: none;
+}
+
+.app .header-right {
+  justify-self: end;
+}
+
+.app .mission-tag {
+  color: #aec0d6;
+  font-size: 10px;
+  gap: 9px;
+}
+
+.app .mission-tag > span {
+  width: 5px;
+  height: 5px;
+  box-shadow: 0 0 10px #7ce7d558;
+}
+
+.page-sky .site-header { height: 72px; }
+.page-explore .site-header { height: 73px; }
+
+.page-home .site-header {
+  position: absolute;
+  inset: 0 0 auto;
+  background: linear-gradient(180deg, #0409108f, #060c1638);
+  border-bottom-color: #c5ddff0d;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.page-home .brand-hero {
+  height: 100svh;
+  min-height: 680px;
+  max-height: 1440px;
+  isolation: isolate;
+  background-position: center 30%;
+  /* Extend the lower star field upward behind the translucent header. */
+  background-repeat: repeat-y;
+}
+
+.page-home .brand-hero::before {
+  z-index: 1;
+  background:
+    linear-gradient(90deg, transparent 26%, #050a112b 47%, #050a11c4 76%, #050a11e6),
+    linear-gradient(180deg, #04091045, transparent 23%, transparent 72%, #050a11e6);
+}
+
+.page-home .brand-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(var(--hero-background-top, 0px) + 72px);
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, #05070c40, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 72px), transparent);
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 72px), transparent);
+}
+
+.page-home .brand-hero-copy {
+  top: 51%;
+  right: 6.5%;
+  bottom: auto;
+  left: auto;
+  transform: translateY(-50%);
+  width: min(40%, 610px);
+  align-items: flex-start;
+  text-align: left;
+  gap: 29px;
+}
+
+.page-home .brand-hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 10px;
+  line-height: 1.8;
+  letter-spacing: 2.1px;
+  text-transform: uppercase;
+  color: #b5cee8;
+}
+
+.brand-hero-eyebrow i {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 15px #7ce7d566;
+}
+
+.page-home .brand-hero-title {
+  width: 100%;
+  line-height: 1;
+  margin: 0 0 2px;
+  filter: drop-shadow(0 3px 24px #0005);
+}
+
+.page-home .brand-logo .tagline {
+  font-family: Inter, Arial, sans-serif;
+  font-weight: 600;
+}
+
+.page-home .brand-hero-copy > p {
+  max-width: 31em;
+  font-size: clamp(17px, 1.2vw, 21px);
+  font-weight: 400;
+  line-height: 1.8;
+  letter-spacing: -.25px;
+  color: #d5dfeb;
+  text-wrap: pretty;
+  text-shadow: 0 2px 16px #000a;
+}
+
+.page-home .brand-hero-actions {
+  justify-content: flex-start;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.page-home .brand-hero-actions .button {
+  min-height: 56px;
+  padding: 0 24px;
+  gap: 28px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+
+.page-home .brand-hero-actions .primary {
+  background: #8ae9d9;
+  border-color: #8ae9d9;
+  box-shadow: 0 4px 30px #7ce7d519;
+}
+
+.page-home .brand-hero-actions .primary:hover {
+  background: #b0f7e9;
+  border-color: #b0f7e9;
+  box-shadow: 0 6px 34px #7ce7d52a;
+}
+
+.page-home .brand-hero-actions .secondary {
+  gap: 11px;
+  color: #d9e6f7;
+  border-color: #a5c7ec40;
+  background: #0c15235e;
+  backdrop-filter: blur(12px);
+}
+
+.page-home .brand-hero-actions .secondary:hover {
+  border-color: #b8d5f888;
+  background: #1d32487a;
+  color: #fff;
+}
+
+.brand-hero-invitation {
+  margin-top: -11px;
+  color: #a9b9cb;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.page-home .brand-hero-credit {
+  left: 5.5%;
+  right: 5.5%;
+  bottom: 23px;
+  max-width: 570px;
+  color: #a2afc0;
+  font-size: 10px;
+  line-height: 1.8;
+  text-shadow: 0 1px 8px #000;
+}
+
+@media (max-width: 1150px) {
+  .app .site-header { gap: 18px; padding-inline: 4%; }
+  .app .site-header .brand > small { display: none; }
+  .app .site-header nav a { padding-inline: 14px; }
+  .app .mission-tag { font-size: 9px; }
+  .page-home .brand-hero-copy { right: 5%; width: 43%; gap: 24px; }
+  .page-home .brand-hero-eyebrow { font-size: 9px; letter-spacing: 1.5px; }
+  .page-home .brand-hero-actions .button { padding-inline: 20px; gap: 20px; }
+}
+
+@media (max-width: 760px) {
+  .app .site-header {
+    grid-template-columns: 1fr auto;
+    height: 72px;
+    padding-inline: 6%;
+  }
+  .app .site-header .brand .wordmark { height: 23px; }
+  .app .header-right { gap: 14px; }
+  .app .mission-tag { display: none; }
+  .app .mobile-menu {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border: 1px solid #b3cfff26;
+    border-radius: 7px;
+    color: #d3e1f3;
+    background: #13203250;
+  }
+  .app .site-header nav {
+    display: none;
+    position: absolute;
+    top: 80px;
+    left: 5%;
+    right: 5%;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid #aacdf92b;
+    border-radius: 12px;
+    background: #091320f5;
+    box-shadow: 0 16px 45px #0005;
+  }
+  .app .site-header nav.open { display: flex; flex-direction: column; gap: 5px; }
+  .app .site-header nav a { width: 100%; min-height: 48px; font-size: 15px; }
+  .page-home .brand-hero {
+    min-height: 800px;
+    height: 100svh;
+    max-height: 1200px;
+    background-position: 28% 30%;
+  }
+  .page-home .brand-hero::before {
+    background: linear-gradient(180deg, #04091036, transparent 19%, #050a1130 35%, #050a11ed 62%, #050a11 100%);
+  }
+  .page-home .brand-hero-copy {
+    top: auto;
+    bottom: 104px;
+    left: 7%;
+    right: 7%;
+    width: auto;
+    max-width: 560px;
+    transform: none;
+    gap: 22px;
+  }
+  .page-home .brand-hero-title { width: min(100%, 480px); }
+  .page-home .brand-hero-eyebrow { font-size: 9px; letter-spacing: 1.5px; }
+  .page-home .brand-hero-copy > p { font-size: 17px; max-width: 30em; line-height: 1.75; }
+  .page-home .brand-hero-actions { gap: 12px; }
+  .page-home .brand-hero-actions .button { min-height: 52px; font-size: 14px; padding-inline: 20px; }
+  .brand-hero-invitation { margin-top: -7px; font-size: 11px; }
+  .page-home .brand-hero-credit { left: 7%; right: 7%; bottom: 22px; font-size: 9px; }
+}
+
+@media (max-width: 380px) {
+  .page-home .brand-hero { min-height: 820px; }
+  .page-home .brand-hero-copy { left: 6%; right: 6%; }
+  .page-home .brand-hero-eyebrow { letter-spacing: 1px; font-size: 8px; }
+  .page-home .brand-hero-actions { width: 100%; }
+  .page-home .brand-hero-actions .button { flex: 1; padding-inline: 14px; gap: 12px; font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .page-home .brand-hero,
+  .app .site-header nav a,
+  .page-home .brand-hero-actions .button { animation: none; transition: none; }
+}

@@ -9,12 +9,13 @@ import { Icon } from '../components/Icons'
 import FrameCanvas from '../components/FrameCanvas'
 import Pictogram from '../components/Pictogram'
 import FollowStar from '../components/FollowStar'
+import './Classify.css'
 
 const CHOICES: { label: Label; title: string; hint: string }[] = [
-  { label: 'moving', title: 'It moves', hint: 'The dot is in a different place over time' },
-  { label: 'variable', title: 'It blinks in place', hint: 'Same place, but brighter or fainter' },
-  { label: 'artifact', title: 'It’s a glitch', hint: 'Shows up once, or has an odd shape' },
-  { label: 'unsure', title: 'Not sure', hint: 'A useful answer too' },
+  { label: 'moving', title: 'It moves', hint: 'Its position changes from one photograph to the next.' },
+  { label: 'variable', title: 'It blinks in place', hint: 'It stays in place, but gets brighter or fainter.' },
+  { label: 'artifact', title: 'It’s a glitch', hint: 'It appears once, or has an unusual shape.' },
+  { label: 'unsure', title: 'Not sure', hint: 'If the evidence is unclear, this helps too.' },
 ]
 const ANSWER: Record<Label, string> = {
   moving: 'it moves: the dot changes place along a line.',
@@ -28,14 +29,15 @@ function Intro({ onPractice, onStart }: { onPractice: () => void; onStart: () =>
   const steps: [string, string, ReactNode][] = [
     ['Watch', 'Each loop shows the same small patch of sky, photographed by SPHEREx over days or months. A computer flagged a glowing dot in it.', <Pictogram label="moving" />],
     ['Decide', 'Does the dot move, blink in place, or show up only once? You do not need to know any astronomy.', <Pictogram label="variable" />],
-    ['Count', 'Many people answer each spot. Some spots are hidden tests with a known answer, so the project can measure how reliable every answer is.', <Pictogram label="artifact" />],
+    ['Contribute', 'Your answer joins other volunteers’ observations. Hidden examples with known answers help measure how reliable the classifications are.', <Pictogram label="artifact" />],
   ]
   return <div className="modal-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="intro-title" className="classify-intro">
     <span className="eyebrow">HOW IT WORKS · 30 SECONDS</span>
-    <h2 id="intro-title">Help a computer tell real objects from noise.</h2>
+    <h2 id="intro-title">A small observation.<br /><em>A real contribution.</em></h2>
+    <p className="intro-lead">Help distinguish changing objects from noise in the infrared sky. No astronomy experience needed.</p>
     <ol>{steps.map(([title, text, pic], i) => <li key={title}><span className="step-n">{i + 1}</span>{pic}<div><strong>{title}</strong><p>{text}</p></div></li>)}</ol>
     <div className="intro-actions">
-      <button className="button primary" onClick={onPractice}>Practice with answers first <Icon name="arrow" size={16} /></button>
+      <button className="button primary" onClick={onPractice}>Try a practice field <Icon name="arrow" size={16} /></button>
       <button className="text-button" onClick={onStart}>Start with real data</button>
     </div>
   </section></div>
@@ -127,8 +129,8 @@ export default function ClassifyPage(p: Props) {
   return <div className="classify2">
     {intro && <Intro onPractice={() => { closeIntro(); if (!training) p.onTraining() }} onStart={() => { closeIntro(); if (training) p.onRealData() }} />}
     <div className="mode-switch" role="tablist" aria-label="How to help">
-      <button role="tab" aria-selected={mode === 'spots'} className={mode === 'spots' ? 'active' : ''} onClick={() => setMode('spots')}><strong>Check the computer’s spots</strong><small>Quick yes/no style answers on dots it flagged</small></button>
-      <button role="tab" aria-selected={mode === 'follow'} className={mode === 'follow' ? 'active' : ''} onClick={() => setMode('follow')}><strong>Follow your own star</strong><small>Pick any dot or area; we measure it and you report</small></button>
+      <button role="tab" aria-selected={mode === 'spots'} className={mode === 'spots' ? 'active' : ''} onClick={() => setMode('spots')}><span className="mode-icon"><Icon name="crosshair" size={22} /></span><span className="mode-copy"><strong>Review a detected spot</strong><small>Watch the evidence and choose what you see.</small></span><Icon name="arrow" size={18} /></button>
+      <button role="tab" aria-selected={mode === 'follow'} className={mode === 'follow' ? 'active' : ''} onClick={() => setMode('follow')}><span className="mode-icon"><Icon name="star" size={22} /></span><span className="mode-copy"><strong>Follow your own star</strong><small>Choose a dot or an area and explore its changes.</small></span><Icon name="arrow" size={18} /></button>
     </div>
     <nav className="field-chips" aria-label="Fields to classify">
       <button className={training ? 'active practice' : 'practice'} onClick={p.onTraining}><Icon name="play" size={12} />Practice</button>
@@ -192,7 +194,9 @@ export default function ClassifyPage(p: Props) {
 
       <aside className="ask">
         {complete && !training ? <div className="ready"><strong>Field complete.</strong> Pick another field above or below, or practise again.</div> : <>
-        <h2>What is the glowing dot doing?</h2>
+        <span className="eyebrow answer-eyebrow">YOUR OBSERVATION</span>
+        <h2>What is the<br className="answer-break" /> glowing dot doing?</h2>
+        <p className="answer-help">Watch the loop, compare the photographs, then choose the best match.</p>
         <div className="choices">{CHOICES.map((c, i) => <button key={c.label} disabled={!candidate} onClick={() => p.onVote(c.label)}
           className={'choice ' + (answered?.label === c.label ? 'chosen ' : '') + (training && answered && candidate?.suggested_label === c.label ? 'correct' : '')}>
           <Pictogram label={c.label} /><span><strong>{c.title}</strong><small>{c.hint}</small></span><kbd>{i + 1}</kbd>
@@ -212,7 +216,7 @@ export default function ClassifyPage(p: Props) {
         </div>}
 
         <div className="ask-actions">
-          {!complete && <button className="button secondary" disabled={!candidate} onClick={p.onNext}>{answered ? 'Next spot' : 'Skip'} <Icon name="arrow" size={14} /></button>}
+          {!complete && <button className="button secondary" disabled={!candidate} onClick={p.onNext}>{answered ? 'Next spot' : 'Skip this spot'} <Icon name="arrow" size={14} /></button>}
           {!training && <button className="text-button" onClick={p.onExplore}>Open the whole field</button>}
         </div>
 
