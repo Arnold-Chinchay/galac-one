@@ -224,3 +224,8 @@ dt{font-size:12px}dd{font-size:14px}
 .brand-hero-credit{position:absolute;left:20px;bottom:14px;font-size:10px;color:#8b8577}
 @media (max-aspect-ratio:1/1){.brand-hero-copy{right:auto;left:50%;top:auto;bottom:9vh;transform:translateX(-50%);width:88vw;align-items:center;text-align:center}.brand-hero-actions{justify-content:center}.brand-hero{background-position:30% 30%}}
 @media (max-width:760px){.brand>small{display:none}.brand .wordmark{height:18px}}
+
+/* Page entrances */
+@keyframes page-in{from{opacity:0;transform:scale(1.015)}to{opacity:1;transform:none}}
+.sky-home,.brand-hero{animation:page-in .6s ease-out both}
+@media(prefers-reduced-motion:reduce){.sky-home,.brand-hero{animation:none}}
