@@ -24,6 +24,20 @@ def sep_arcsec(a: dict, b: dict) -> float:
     return math.degrees(math.acos(max(-1.0, min(1.0, c)))) * 3600
 
 
+def band(spec: list[dict], lo: float, key: str):
+    return next((b.get(key) for b in spec if abs(b["lam_um"][0] - lo) < 1e-6), None)
+
+
+def rises_to_4_5um(spec: list[dict]) -> bool:
+    """A cold Y dwarf is faint at 3.5-4.0 um (methane) and peaks near 4.5 um: its excess at 4.4-4.7 must be at least
+    twice that at 3.5-4.0 (WISE 0855: 0.13 vs 0.012 MJy/sr). Uses the flux when present, else the signal-to-noise."""
+    for key, factor in (("excess_mjy_sr", 2.0), ("snr", 1.0)):
+        a, b = band(spec, 3.5, key), band(spec, 4.4, key)
+        if a is not None and b is not None and math.isfinite(a) and math.isfinite(b):
+            return b >= factor * max(a, 0.0) and b > 0
+    return False
+
+
 def summarise(s: dict) -> dict:
     m = s.get("motion") or None
     # Frames spanning only days cannot give a motion: drop it rather than publish a meaningless number.
@@ -31,14 +45,17 @@ def summarise(s: dict) -> dict:
         m = None
     out = {"ra": round(s["ra"], 6), "dec": round(s["dec"], 6), "excess_snr": round(s["excess_snr"], 1),
            "colour_vs_stars": None if not math.isfinite(s.get("colour_vs_stars", math.inf)) else round(s["colour_vs_stars"], 2),
-           "y_dwarf_like": bool(s.get("y_dwarf_like")),
-           "spectrum": [{"lam_um": b["lam_um"], "snr": None if b.get("snr") is None or not math.isfinite(b["snr"]) else round(b["snr"], 1)}
+           "y_dwarf_like": bool(s.get("y_dwarf_like")) and rises_to_4_5um(s.get("spectrum", [])),
+           "spectrum": [{"lam_um": b["lam_um"],
+                         "snr": None if b.get("snr") is None or not math.isfinite(b["snr"]) else round(b["snr"], 1),
+                         "excess_mjy_sr": None if b.get("excess_mjy_sr") is None or not math.isfinite(b["excess_mjy_sr"]) else round(b["excess_mjy_sr"], 4)}
                         for b in s.get("spectrum", [])]}
     if m:
         total = math.hypot(m["pm_ra_arcsec_yr"], m["pm_dec_arcsec_yr"])
         out["motion"] = {"pm_ra": round(m["pm_ra_arcsec_yr"], 2), "pm_dec": round(m["pm_dec_arcsec_yr"], 2), "total": round(total, 2),
                          "err": round(m["err_arcsec_yr"], 2), "p_null": round(m["p_null"], 3), "years": round(m["years"], 2)}
-        out["moving"] = m["p_null"] < 0.05 and total >= 2 * m["err_arcsec_yr"]
+        # A hint only: 40 random splits cannot give p below ~0.025, and thousands of sources are tested.
+        out["moving"] = m["p_null"] < 0.05 and total >= 3 * m["err_arcsec_yr"] and m["years"] >= 0.3
     else:
         out["motion"], out["moving"] = None, False
     return out
