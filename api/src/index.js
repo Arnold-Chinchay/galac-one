@@ -18,11 +18,44 @@ function parseTrack(s) {
   try { return s ? JSON.parse(s) : null; } catch { return null; }
 }
 
+// Playable fields the sky crawler cuts around its most promising red sources (files on Hugging Face).
+const SKY_FIELDS = "https://huggingface.co/datasets/naylamp-space/spherex-deep-sky/resolve/main/fields/index.json";
+const SKY_ID = /^sky\d+-[0-9a-f]{6}$/;
+async function skyFields() {
+  try {
+    const r = await fetch(SKY_FIELDS, { cf: { cacheTtl: 600, cacheEverything: true } });
+    if (!r.ok) return [];
+    const rows = (await r.json()).tiles ?? [];
+    return rows.filter((t) => SKY_ID.test(t.id) && typeof t.files_url === "string" && t.files_url.startsWith("https://huggingface.co/"));
+  } catch { return []; }
+}
+
 async function listTiles(env) {
-  const { results } = await env.DB.prepare(
-    "SELECT id, ra, dec, fov_deg, release, n_frames, completeness, label FROM tiles WHERE status = 'ready' ORDER BY created_at DESC LIMIT 200"
-  ).all();
-  return json({ tiles: results.map((t) => ({ ...t, files_url: filesUrl(t.id) })) });
+  const [{ results }, sky] = await Promise.all([env.DB.prepare(
+    "SELECT id, ra, dec, fov_deg, release, n_frames, completeness, label FROM tiles WHERE status = 'ready' AND id NOT LIKE 'sky%' ORDER BY created_at DESC LIMIT 200"
+  ).all(), skyFields()]);
+  const fixed = results.map((t) => ({ ...t, files_url: filesUrl(t.id) }));
+  const fresh = sky.map(({ id, ra, dec, fov_deg, release, n_frames, label, files_url }) => ({ id, ra, dec, fov_deg, release, n_frames, completeness: null, label, files_url, sky: true }));
+  return json({ tiles: [...fixed, ...fresh] });
+}
+
+// The first vote on a crawler field registers it and its spots, so votes keep their foreign keys.
+async function registerSkyFields(env, ids) {
+  const tileIds = [...new Set(ids.map((id) => id.replace(/-c\d+$/, "")).filter((t) => SKY_ID.test(t)))];
+  if (!tileIds.length) return;
+  const rows = (await skyFields()).filter((t) => tileIds.includes(t.id));
+  for (const t of rows) {
+    const r = await fetch(t.files_url + "candidates.json", { cf: { cacheTtl: 3600, cacheEverything: true } }).catch(() => null);
+    if (!r?.ok) continue;
+    const cands = (await r.json().catch(() => [])).filter((c) => typeof c?.id === "string" && c.id.startsWith(t.id + "-c"));
+    await env.DB.batch([
+      env.DB.prepare("INSERT OR IGNORE INTO tiles (id, ra, dec, fov_deg, release, status, n_frames, label) VALUES (?1, ?2, ?3, ?4, ?5, 'ready', ?6, ?7)")
+        .bind(t.id, t.ra, t.dec, t.fov_deg, t.release || "DR1+QR3", t.n_frames ?? null, String(t.label ?? t.id).slice(0, 80)),
+      ...cands.slice(0, 20).map((c) => env.DB.prepare(
+        "INSERT OR IGNORE INTO candidates (id, tile_id, x, y, t_ref, kind, score, is_injection, track) VALUES (?1, ?2, ?3, ?4, ?5, NULL, NULL, 0, ?6)"
+      ).bind(c.id, t.id, Number(c.x), Number(c.y), Number.isFinite(c.frame) ? c.frame : null, c.track ? JSON.stringify(c.track) : null)),
+    ]);
+  }
 }
 
 // Candidates of a tile with public vote counts. Does not select is_injection.
@@ -68,7 +101,10 @@ async function postVotes(env, request) {
   // keep only candidates that exist (D1 enforces foreign keys)
   const ids = [...new Set(votes.map((v) => v.candidate_id))];
   const ph = ids.map((_, i) => `?${i + 1}`).join(",");
-  const known = new Set((await env.DB.prepare(`SELECT id FROM candidates WHERE id IN (${ph})`).bind(...ids).all()).results.map((r) => r.id));
+  const lookup = async () => new Set((await env.DB.prepare(`SELECT id FROM candidates WHERE id IN (${ph})`).bind(...ids).all()).results.map((r) => r.id));
+  let known = await lookup();
+  const missing = ids.filter((id) => !known.has(id));
+  if (missing.some((id) => id.startsWith("sky"))) { try { await registerSkyFields(env, missing); known = await lookup(); } catch { /* field not reachable: those votes are ignored */ } }
   const valid = votes.filter((v) => known.has(v.candidate_id));
   if (!valid.length) return err(400, "no known candidates in votes");
 

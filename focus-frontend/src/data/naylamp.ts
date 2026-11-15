@@ -134,7 +134,8 @@ export async function loadNaylampTile(manifestUrl: string, raw: NaylampManifest,
     return decodeF16(new Uint16Array(buffer))
   }
   const candidateList = async () => {
-    if (candidatesUrl) try { return (await json<{ candidates: NaylampCandidate[] }>(candidatesUrl, signal)).candidates } catch (e) { if (signal?.aborted) throw e }
+    // A field the sky search has just published is not in the database until its first vote: read its own list then.
+    if (candidatesUrl) try { const c = (await json<{ candidates: NaylampCandidate[] }>(candidatesUrl, signal)).candidates; if (c?.length) return c } catch (e) { if (signal?.aborted) throw e }
     return json<NaylampCandidate[]>(rel('candidates.json'), signal).catch(e => { if (signal?.aborted) throw e; return [] })
   }
   const [rawFrames, science, residual, rawCandidates] = await Promise.all([

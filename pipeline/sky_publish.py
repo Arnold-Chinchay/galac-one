@@ -14,6 +14,32 @@ from pipeline.region_analysis import rises_to_4_5um
 
 LAYER = "hips/deep-sky"
 INDEX = "analysis/index.json"
+FIELDS = "fields/index.json"
+MAX_FIELDS = 30
+BASE = "https://huggingface.co/datasets/{repo}/resolve/main/fields/{id}/"
+
+
+def update_fields(api: HfApi, repo: str, token: str, dirs: list[Path]) -> None:
+    """Upload new playable fields and list them for the site: cold-dwarf colours first, then newest; old ones drop off the list."""
+    try:
+        index = json.loads(Path(hf_hub_download(repo, FIELDS, repo_type="dataset", token=token)).read_text())
+    except EntryNotFoundError:
+        index = {"tiles": []}
+    stage = Path("publish/fields")
+    shutil.rmtree(stage, ignore_errors=True)
+    stage.mkdir(parents=True)
+    new = []
+    for d in dirs:
+        row = json.loads((d / "row.json").read_text())
+        shutil.copytree(d, stage / row["id"], ignore=shutil.ignore_patterns("row.json"))
+        new.append({**row, "files_url": BASE.format(repo=repo, id=row["id"])})
+    ids = {r["id"] for r in new}
+    rows = new + [r for r in index["tiles"] if r["id"] not in ids]
+    index["tiles"] = sorted(rows, key=lambda r: not r.get("cold"))[:MAX_FIELDS]
+    (stage / "index.json").write_text(json.dumps(index))
+    api.upload_folder(repo_id=repo, repo_type="dataset", folder_path=str(stage), path_in_repo="fields",
+                      commit_message=f"Playable fields: {len(new)} new")
+    print(f"playable fields: {len(new)} new, {len(index['tiles'])} listed")
 
 
 def update_index(api: HfApi, repo: str, token: str, files: list[Path]) -> None:
@@ -54,6 +80,7 @@ def main() -> None:
     a.add_argument("--repo", required=True)
     a.add_argument("--hips", type=Path, nargs="*", default=[], help="HiPS folders of the new regions")
     a.add_argument("--analysis", type=Path, nargs="*", default=[], help="analysis.json of the new regions")
+    a.add_argument("--fields", type=Path, nargs="*", default=[], help="playable field folders cut by sky_field")
     a.add_argument("--state", type=Path, help="updated state/regions.json to upload with the tiles")
     a.add_argument("--message", default="Add regions")
     args = a.parse_args()
@@ -63,6 +90,11 @@ def main() -> None:
 
     if args.analysis:
         update_index(api, args.repo, token, args.analysis)
+    if args.fields:
+        try:
+            update_fields(api, args.repo, token, [d for d in args.fields if (d / "row.json").exists()])
+        except Exception as e:  # never cost the sky layer
+            print("playable fields not published:", e)
     if not args.hips:
         return
     work = Path("publish")

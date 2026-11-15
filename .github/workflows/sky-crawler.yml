@@ -61,6 +61,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       R: ${{ matrix.r.region }}
+      P: ${{ matrix.r.pix }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -93,7 +94,7 @@ jobs:
             mkdir -p "cells/$1" && cp cache/tiles/$n/deep/deep.json cache/tiles/$n/deep/deep_*.f16.bin "cells/$1/"
             # Cold-object search on the same frames; a failure here never costs the image.
             { python -m pipeline.align --name "$n" && python -m pipeline.redsearch --name "$n" --top 3 \
-              && cp "cache/tiles/$n/redsearch.json" "cells/$1/"; } >> "log-$1.txt" 2>&1 || echo "cell $1: cold-object search failed"
+              && cp "cache/tiles/$n/redsearch.json" "cells/$1/"               && python -m pipeline.sky_field --name "$n" --region "$P" --out fields; } >> "log-$1.txt" 2>&1 || echo "cell $1: cold-object search failed"
             rm -rf "cache/tiles/$n"
           }
           export -f cell
@@ -107,6 +108,17 @@ jobs:
         run: python -m pipeline.region_analysis --cells cells --pix ${{ matrix.r.pix }} --ra ${{ matrix.r.ra }} --dec ${{ matrix.r.dec }} --out analysis/analysis.json
       - uses: actions/upload-artifact@v4
         with: { name: "hips-${{ matrix.r.region }}", path: out/hips/, retention-days: 3 }
+      - name: Keep the two most promising playable fields
+        continue-on-error: true
+        run: |
+          mkdir -p fields keep
+          python -c 'import json, pathlib, shutil
+          rows = sorted((json.loads(p.read_text()) for p in pathlib.Path("fields").glob("*/row.json")), key=lambda r: (not r["cold"], -r["excess_snr"]))
+          [shutil.copytree("fields/" + r["id"], "keep/" + r["id"]) for r in rows[:2]]
+          print("playable fields:", [r["id"] for r in rows[:2]], "of", len(rows))'
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('keep/*/row.json') != ''
+        with: { name: "fields-${{ matrix.r.region }}", path: keep/, retention-days: 3 }
       - uses: actions/upload-artifact@v4
         if: hashFiles('analysis/analysis.json') != ''
         with: { name: "analysis-${{ matrix.r.region }}", path: analysis/analysis.json, retention-days: 3 }
@@ -133,6 +145,9 @@ jobs:
         continue-on-error: true
         with: { pattern: "analysis-*", path: found }
       - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { pattern: "fields-*", path: playable, merge-multiple: true }
+      - uses: actions/download-artifact@v4
         with: { name: plan, path: . }
       - name: Region state
         run: |
@@ -147,5 +162,5 @@ jobs:
       - name: Add to the layer on Hugging Face
         run: |
           ls -d built/hips-* > /dev/null 2>&1 || { echo "nothing built"; exit 0; }
-          python -m pipeline.sky_publish --repo ${{ env.HF_REPO }} --hips built/hips-* --analysis $(ls found/*/analysis.json 2>/dev/null) \
+          python -m pipeline.sky_publish --repo ${{ env.HF_REPO }} --hips built/hips-* --analysis $(ls found/*/analysis.json 2>/dev/null)             --fields $(ls -d playable/*/ 2>/dev/null) \
             --state state.json --message "Add $(ls -d built/hips-* | wc -l) regions"

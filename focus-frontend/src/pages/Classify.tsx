@@ -174,7 +174,9 @@ export default function ClassifyPage(p: Props) {
       {mode !== 'hunt' && <label className="field-select"><span>Field</span>
         <select value={training ? '__practice' : tile.manifest.tile_id} onChange={e => { if (e.target.value === '__practice') p.onTraining(); else { const t = fields.find(x => x.tile_id === e.target.value); if (t) p.onField(t) } }}>
           <option value="__practice">Practice (answers shown)</option>
-          {fields.map(t => <option key={t.tile_id} value={t.tile_id}>{t.title}</option>)}
+          <optgroup label="Challenge fields">{fields.filter(t => !t.tile_id.startsWith('sky')).map(t => <option key={t.tile_id} value={t.tile_id}>{t.title}</option>)}</optgroup>
+          {fields.some(t => t.tile_id.startsWith('sky')) && <optgroup label="New from the sky search">
+            {fields.filter(t => t.tile_id.startsWith('sky')).map(t => <option key={t.tile_id} value={t.tile_id}>{t.title}</option>)}</optgroup>}
         </select></label>}
       <button className="score-pill" onClick={() => setProfile(v => !v)} aria-expanded={profile} title="Your rank, badges and the leaderboard">
         <span className="rank-badge">{rank.level}</span>
