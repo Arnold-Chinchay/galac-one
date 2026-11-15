@@ -81,19 +81,34 @@ def join(cell_dirs: list[Path], ra: float, dec: float, size: float, out: Path) -
 
     # One fixed stretch for the whole sky (MJy/sr, measured on the Barnard mosaic): regions built on different
     # days then meet without seams. Values are (noise, bright level) per band.
+    # Saturated star cores are masked in the stacks, often in one band but not another, which left one-coloured
+    # (red) or black centres. A pixel masked in any band, and a thin ring around it, is drawn white in every band.
+    from scipy.ndimage import binary_dilation, gaussian_filter
+    inside = cover > 0
+    core = inside & binary_dilation(np.any([np.isnan(mosaic[b]) for b in BANDS], axis=0) & inside, iterations=2)
     chans = []
     for b in BANDS:
-        d = fill_saturated(mosaic[b].copy())
+        d = fill_saturated(mosaic[b].copy(), rounds=64, keep_nan=True)
         noise, top = STRETCH[b]
-        x = np.arcsinh(np.clip(d, 0, None) / (3 * noise)) / np.arcsinh(top / (3 * noise))
-        chans.append(np.clip(x, 0, 1))
-    rgb = np.stack(chans, axis=-1)
-    # Alpha fades the outer edge of the region into the all-sky map instead of cutting it.
-    # Opaque wherever any cell has data (overlap weights are low where cells meet, so they cannot be the alpha).
-    from scipy.ndimage import distance_transform_edt
-    covered = (cover > 0) & np.all([np.isfinite(mosaic[b]) for b in BANDS], axis=0)
+        x = np.arcsinh(np.clip(np.nan_to_num(d, nan=0.0), 0, None) / (3 * noise)) / np.arcsinh(top / (3 * noise))
+        x = np.clip(x, 0, 1)
+        chans.append(x)
+    # Saturation also leaves finite but sunken centres in the short-wavelength bands while the long one stays at the
+    # top: a one-coloured (red) or dark disc. Where any band is at its top and another sinks well below its own
+    # glow, the star is saturated there: draw it white.
+    from scipy.ndimage import maximum_filter
+    top_any = np.max(chans, axis=0) > 0.95
+    sunk = np.any([(maximum_filter(x, size=9) > 0.6) & (x < maximum_filter(x, size=9) - 0.2) for x in chans], axis=0)
+    core |= binary_dilation(top_any & sunk & inside, iterations=2)
+    soft = np.clip(gaussian_filter(core.astype(np.float32), 1.0) * 1.6, 0, 1)
+    rgb = np.stack([x * (1 - soft) + soft for x in chans], axis=-1)
+    # Alpha fades the outer edge of the region into whatever is beneath (the all-sky map or a neighbouring region).
+    # Neighbouring regions overlap by about 0.7 deg, so a 0.2 deg cross-fade hides where one ends and the next begins.
+    # It follows the footprint only: masked star cores must not punch holes in it.
+    from scipy.ndimage import binary_fill_holes, distance_transform_edt
+    covered = binary_fill_holes(inside)
     covered[[0, -1], :] = covered[:, [0, -1]] = False
-    alpha = np.clip(distance_transform_edt(covered) / max(8, 0.04 * n), 0, 1)
+    alpha = np.clip(distance_transform_edt(covered) / max(8, 0.2 / size * n), 0, 1)
     alpha = 0.5 - 0.5 * np.cos(np.pi * alpha)
     rgba = np.dstack([rgb, alpha])[::-1]                      # north up for the PNG
     png = out / "mosaic.png"

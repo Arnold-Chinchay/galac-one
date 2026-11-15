@@ -114,7 +114,7 @@ def png(path: Path, rgb: np.ndarray) -> None:
                      + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
 
-def fill_saturated(d: np.ndarray, rounds: int = 8) -> np.ndarray:
+def fill_saturated(d: np.ndarray, rounds: int = 8, keep_nan: bool = False) -> np.ndarray:
     """Masked (saturated) star cores take the brightest valid neighbour, so they render as bright cores, not holes."""
     from scipy.ndimage import maximum_filter
     d = d.copy()
@@ -124,7 +124,7 @@ def fill_saturated(d: np.ndarray, rounds: int = 8) -> np.ndarray:
             break
         grown = maximum_filter(np.where(hole, -np.inf, d), size=3)
         d[hole & np.isfinite(grown)] = grown[hole & np.isfinite(grown)]
-    return np.nan_to_num(d, nan=0.0)
+    return d if keep_nan else np.nan_to_num(d, nan=0.0)
 
 
 def asinh_rgb(bands: dict[str, np.ndarray]) -> np.ndarray:
