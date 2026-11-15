@@ -91,6 +91,9 @@ jobs:
             python -m pipeline.fetch_tile --ra "$2" --dec "$3" --name "$n" --fov 0.45 --workers 16 --via local --store store --source index --index cache/merged/*.csv.gz > "log-$1.txt" 2>&1
             python -m pipeline.deep --name "$n" --size 0.4 --oversample 2 --method drizzle --procs 2 >> "log-$1.txt" 2>&1
             mkdir -p "cells/$1" && cp cache/tiles/$n/deep/deep.json cache/tiles/$n/deep/deep_*.f16.bin "cells/$1/"
+            # Cold-object search on the same frames; a failure here never costs the image.
+            { python -m pipeline.align --name "$n" && python -m pipeline.redsearch --name "$n" --top 3 \
+              && cp "cache/tiles/$n/redsearch.json" "cells/$1/"; } >> "log-$1.txt" 2>&1 || echo "cell $1: cold-object search failed"
             rm -rf "cache/tiles/$n"
           }
           export -f cell
@@ -99,8 +102,14 @@ jobs:
           rm -rf store
       - name: Join and cut HiPS
         run: python -m pipeline.mosaic join --ra ${{ matrix.r.ra }} --dec ${{ matrix.r.dec }} --size 2.6 --cells cells --out out
+      - name: Merge the cold-object search
+        continue-on-error: true
+        run: python -m pipeline.region_analysis --cells cells --pix ${{ matrix.r.pix }} --ra ${{ matrix.r.ra }} --dec ${{ matrix.r.dec }} --out analysis/analysis.json
       - uses: actions/upload-artifact@v4
         with: { name: "hips-${{ matrix.r.region }}", path: out/hips/, retention-days: 3 }
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('analysis/analysis.json') != ''
+        with: { name: "analysis-${{ matrix.r.region }}", path: analysis/analysis.json, retention-days: 3 }
 
   publish:
     needs: [plan, region]
@@ -121,6 +130,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { pattern: "hips-*", path: built }
       - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { pattern: "analysis-*", path: found }
+      - uses: actions/download-artifact@v4
         with: { name: plan, path: . }
       - name: Region state
         run: |
@@ -135,4 +147,5 @@ jobs:
       - name: Add to the layer on Hugging Face
         run: |
           ls -d built/hips-* > /dev/null 2>&1 || { echo "nothing built"; exit 0; }
-          python -m pipeline.sky_publish --repo ${{ env.HF_REPO }} --hips built/hips-* --state state.json --message "Add $(ls -d built/hips-* | wc -l) regions"
+          python -m pipeline.sky_publish --repo ${{ env.HF_REPO }} --hips built/hips-* --analysis $(ls found/*/analysis.json 2>/dev/null) \
+            --state state.json --message "Add $(ls -d built/hips-* | wc -l) regions"

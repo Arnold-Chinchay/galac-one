@@ -4,6 +4,7 @@ import { Icon } from '../components/Icons'
 import SkyMap from '../components/SkyMap'
 import { Logo } from '../components/Brand'
 import IntroSky from '../components/IntroSky'
+import SkySearch from '../components/SkySearch'
 
 interface Props { targets: Field[]; community: CommunityStats | null; onOpen: (t: Field) => void; onClassify: (t?: Field) => void; onTraining: () => void }
 interface IntroProps { onEnter: () => void; onTraining: () => void }
@@ -40,11 +41,12 @@ const DEEP_SKY = 'https://huggingface.co/datasets/naylamp-space/spherex-deep-sky
 export default function Home({ targets, community, onOpen, onClassify, onTraining }: Props) {
   const [pickedTitle, setPickedTitle] = useState<string | null>(null)
   const picked = targets.find(t => t.title === pickedTitle) ?? null
+  const [spot, setSpot] = useState<{ ra: number; dec: number } | null>(null)
   const marks = targets.map(t => ({ id: t.tile_id, title: t.title, ra: t.center.ra_deg, dec: t.center.dec_deg }))
 
   return <section className="sky-home">
     <SkyMap ra={180} dec={0} fovDeg={360} allSky height="100%" caption={false} marks={marks} inset={392}
-      focus={picked ? { ra: picked.center.ra_deg, dec: picked.center.dec_deg } : null}
+      focus={picked ? { ra: picked.center.ra_deg, dec: picked.center.dec_deg } : spot}
       mosaics={[DEEP_SKY]}
       onSelect={id => setPickedTitle(targets.find(x => x.tile_id === id)?.title ?? null)} />
 
@@ -58,6 +60,7 @@ export default function Home({ targets, community, onOpen, onClassify, onTrainin
         <button className="button primary large" onClick={() => onClassify()}>Help find moving objects <Icon name="arrow" size={18} /></button>
         <button className="text-button" onClick={onTraining}>Practice first, with answers shown</button>
         <p className="sky-stats">{community ? `${community.candidates} candidates · ${community.votes} classifications so far` : 'Open to everyone. No account needed.'}</p>
+        <SkySearch onFocus={(ra, dec) => setSpot({ ra, dec })} />
       </> : <>
         <button className="text-button back" onClick={() => setPickedTitle(null)}><Icon name="back" size={15} />All fields</button>
         <h2>{picked.title}</h2>
