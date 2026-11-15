@@ -101,6 +101,7 @@ export default function SkyHunt({ onAnswered, alias }: { onAnswered: (cold: bool
       if ((e.target as HTMLElement)?.closest('input,textarea,select')) return
       const i = ['1', '2', '3', '4'].indexOf(e.key)
       if (i >= 0) { e.preventDefault(); e.stopImmediatePropagation(); void answer(CHOICES[i].label) }
+      if (e.key === '5' && hit && !picked) { e.preventDefault(); e.stopImmediatePropagation(); next() }
       if (e.key === 'Enter' && picked) { e.preventDefault(); e.stopImmediatePropagation(); next() }
     }
     window.addEventListener('keydown', key, true)
@@ -132,8 +133,11 @@ export default function SkyHunt({ onAnswered, alias }: { onAnswered: (cold: bool
         {error && <span className="warn"> Not saved: {error}</span>}
         <button className="button primary compact" onClick={next}>Next source <Icon name="arrow" size={14} /></button>
       </div>}
-      {!picked && <div className="answer-foot"><button className="button secondary compact" disabled={!hit} onClick={next}>Skip <Icon name="arrow" size={14} /></button>
-        <span>{Object.keys(done).length} looked at · {regions?.length ?? 0} regions searched</span></div>}
+      {!picked && <button className="answer unsure" disabled={!hit} onClick={next}>
+        <svg className="look" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="8" fill="#05080f" /><text x="20" y="27" textAnchor="middle" fontSize="20" fontWeight="700" fill="#8fa3bb">?</text></svg>
+        <span><strong>I can't tell</strong><small>Too blurry or confusing: show me another one. No points lost.</small></span><kbd>5</kbd>
+      </button>}
+      {!picked && <div className="answer-foot"><span>{Object.keys(done).length} looked at · {regions?.length ?? 0} regions searched</span></div>}
       <p className="play-hint">These come from the automatic search of the sky as it grows. A red dot that the community confirms becomes a lead for astronomers, not yet a discovery.</p>
     </aside>
   </div>
