@@ -16,8 +16,16 @@ from .irsa import CACHE, cutout_url, download_cutout, query_frames, tap_is_up
 from .reduce import reduce_cutout
 
 
-def process_frame(i: int, fr: dict, ra: float, dec: float, fov: float, tile_dir: Path, keep_raw: bool, via: str = "irsa") -> dict:
-    if via == "s3":
+def process_frame(i: int, fr: dict, ra: float, dec: float, fov: float, tile_dir: Path, keep_raw: bool, via: str = "irsa",
+                  store: Path | None = None) -> dict:
+    if via == "local":
+        from .s3cutout import local_cutout, s3_cutout
+        try:
+            red = local_cutout(store, fr["key"], ra, dec, fov)
+        except FileNotFoundError:                     # not in the region store: read it from S3 as before
+            red = s3_cutout(fr["key"], ra, dec, fov)
+        raw = None
+    elif via == "s3":
         from .s3cutout import s3_cutout
         red = s3_cutout(fr["key"], ra, dec, fov)
         raw = None
@@ -44,7 +52,9 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=4, help="parallel downloads (be polite to IRSA: <= 8)")
     ap.add_argument("--max-frames", type=int, default=0, help="0 = all")
     ap.add_argument("--frames-json", help='fallback list: [{"uri": "...", "mjd": 0}] when TAP is down')
-    ap.add_argument("--via", choices=["irsa", "s3"], default="s3", help="s3: range reads from the public bucket (faster, no IRSA load)")
+    ap.add_argument("--via", choices=["irsa", "s3", "local"], default="s3",
+                    help="s3: range reads from the public bucket (faster, no IRSA load); local: cut from --store (pipeline/region_store.py)")
+    ap.add_argument("--store", type=Path, help="region store directory for --via local")
     ap.add_argument("--stride", type=int, default=1, help="take every Nth frame (sorted by time)")
     ap.add_argument("--keep-raw", action="store_true")
     ap.add_argument("--source", choices=["auto", "tap", "index"], default="auto",
@@ -85,7 +95,7 @@ def main() -> None:
 
     metas, failed = [], []
     with ThreadPoolExecutor(max_workers=a.workers) as ex:
-        futs = {ex.submit(process_frame, i, fr, a.ra, a.dec, a.fov, tile_dir, a.keep_raw, a.via): i for i, fr in enumerate(frames)}
+        futs = {ex.submit(process_frame, i, fr, a.ra, a.dec, a.fov, tile_dir, a.keep_raw, a.via, a.store): i for i, fr in enumerate(frames)}
         for f in tqdm(as_completed(futs), total=len(futs), desc=a.name):
             try:
                 metas.append(f.result())

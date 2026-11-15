@@ -71,6 +71,15 @@ jobs:
           mkdir -p cache/merged
           gh release download index-dr1 -p dr1_index.csv.gz -D cache/merged
           gh release download index-qr3 -p qr3_index.csv.gz -D cache/merged
+      - name: Free disk space for the region store
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost &
+          wait
+          df -h / | tail -1
+      - name: Read the region's frames once
+        run: |
+          python -m pipeline.region_store --ra ${{ matrix.r.ra }} --dec ${{ matrix.r.dec }} --size 2.6 --step 0.34 --cell-fov 0.45 --index cache/merged/*.csv.gz --out store --workers 32
+          df -h / | tail -1
       - name: Stack every cell of the region
         run: |
           python -m pipeline.mosaic cells --ra ${{ matrix.r.ra }} --dec ${{ matrix.r.dec }} --size 2.6 --step 0.34 \
@@ -78,7 +87,7 @@ jobs:
           cell() {
             set -e
             n="$R-$1"
-            python -m pipeline.fetch_tile --ra "$2" --dec "$3" --name "$n" --fov 0.45 --workers 16 --via s3 --source index --index cache/merged/*.csv.gz > "log-$1.txt" 2>&1
+            python -m pipeline.fetch_tile --ra "$2" --dec "$3" --name "$n" --fov 0.45 --workers 16 --via local --store store --source index --index cache/merged/*.csv.gz > "log-$1.txt" 2>&1
             python -m pipeline.deep --name "$n" --size 0.4 --oversample 2 --method drizzle --procs 2 >> "log-$1.txt" 2>&1
             mkdir -p "cells/$1" && cp cache/tiles/$n/deep/deep.json cache/tiles/$n/deep/deep_*.f16.bin "cells/$1/"
             rm -rf "cache/tiles/$n"
@@ -86,6 +95,7 @@ jobs:
           export -f cell
           xargs -P 2 -L 1 bash -c 'cell "$@" || echo "cell $1 failed"' _ < cells.txt
           echo "cells stacked: $(ls cells | wc -l) of $(wc -l < cells.txt)"
+          rm -rf store
       - name: Join and cut HiPS
         run: python -m pipeline.mosaic join --ra ${{ matrix.r.ra }} --dec ${{ matrix.r.dec }} --size 2.6 --cells cells --out out
       - uses: actions/upload-artifact@v4
