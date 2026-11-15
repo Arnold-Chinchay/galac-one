@@ -217,7 +217,8 @@ export function drawFrame(canvas: HTMLCanvasElement, tile: Tile, k: number, opti
       // Soft compression: faint changes grow quickly, the huge leftovers of saturated stars level off instead of
       // turning into flat white and blue blocks.
       const v = big[0][i], a = Math.min(1, Math.asinh(Math.max(0, Math.abs(v) - 1.5) / 2) / Math.asinh(5))
-      if (v >= 0) { r = 14 + 241 * Math.min(1, a * 1.6); g = 20 + 200 * a + 35 * Math.max(0, a - .6) * 2.5; b = 34 + 40 * a + 181 * Math.max(0, a - .6) * 2.5 }
+      // Brighter than usual tops out at a soft light amber, never flat white, so a bright star's leftovers stay readable.
+      if (v >= 0) { r = 14 + 241 * Math.min(1, a * 1.5); g = 20 + 188 * a; b = 34 + 86 * a * a }
       else { r = 14 + 40 * a; g = 20 + 130 * a; b = 34 + 221 * a }
     } else { const gain = view === 'motion' ? 255 : 255; r = 10 + big[0][i] * gain; g = 14 + big[1][i] * gain; b = 26 + big[2][i] * gain }
     if (flags && flags[i]) { r = r * .45 + 228 * .55; g = g * .45 + 182 * .55; b = b * .45 + 109 * .55 }

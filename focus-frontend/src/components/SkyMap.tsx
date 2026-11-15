@@ -14,6 +14,10 @@ interface Props {
   mosaics?: string[]
   /** Pixels on the right covered by a panel; fly-to targets land in the visible part. */
   inset?: number
+  /** Closest zoom allowed, degrees; defaults to MIN_FOV (the public map's limit). */
+  minFov?: number
+  /** Text of the button that returns to the starting view. */
+  resetLabel?: string
 }
 
 // The public map stops at 12.9″ pixels; below a degree it turns to blocks except where our deep images sit.
@@ -25,7 +29,7 @@ const sep = (ra1: number, de1: number, ra2: number, de2: number) =>
   Math.acos(Math.min(1, Math.sin(de1 * rad) * Math.sin(de2 * rad) + Math.cos(de1 * rad) * Math.cos(de2 * rad) * Math.cos((ra1 - ra2) * rad))) / rad
 const loadAladin = () => (loader ??= import('aladin-lite').then(async m => { const A = m.default; await A.init; return A }))
 
-export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, box, onSelect, focus, caption = true, mosaics, inset = 0 }: Props) {
+export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, box, onSelect, focus, caption = true, mosaics, inset = 0, minFov = MIN_FOV, resetLabel = 'Whole sky' }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<any>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -61,7 +65,10 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
       }
       try { hips.setColormap('inferno', { stretch: 'asinh' }) } catch { /* older builds: keep grey */ }
       mosaics?.forEach((url, i) => {
-        al.setOverlayImageLayer(A.HiPS(url, { name: 'mosaic-' + i, imgFormat: 'png' }), 'mosaic-' + i)
+        const deep = A.HiPS(url, { name: 'mosaic-' + i, imgFormat: 'png' })
+        // The stacks keep the sky black; lift the faint end so dim sources show up close in.
+        try { deep.setGamma?.(0.7) } catch { /* older builds */ }
+        al.setOverlayImageLayer(deep, 'mosaic-' + i)
       })
       if (box) {
         const ov = A.graphicOverlay({ color: '#f5a524', lineWidth: 2 })
@@ -77,7 +84,7 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
       }
       al.on('zoomChanged', (f: any) => {
         const fov = Array.isArray(f) ? f[0] : typeof f === 'number' ? f : al.getFov()[0]
-        if (fov < MIN_FOV * 0.98) al.setFoV(MIN_FOV)
+        if (fov < minFov * 0.98) al.setFoV(minFov)
         tint(fov)
         setZoomed(fov < fovDeg * 0.9)
       })
@@ -92,7 +99,7 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
         }
         if (best) { select.current?.(best.id); return }
         al.animateToRaDec(e.ra, e.dec, 0.7)
-        al.zoomToFoV(Math.max(MIN_FOV, fov / 2.5), 0.7)
+        al.zoomToFoV(Math.max(minFov, fov / 2.5), 0.7)
         setZoomed(true)
       })
       setState('ready')
@@ -125,7 +132,7 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
   return <figure className="skymap">
     <div ref={el} className="skymap-canvas" style={{ height }} />
     {state !== 'ready' && <div className="skymap-status">{state === 'loading' ? 'Loading the SPHEREx sky map…' : 'The sky map could not be loaded right now.'}</div>}
-    {state === 'ready' && zoomed && <button className="skymap-reset" onClick={reset}>Whole sky</button>}
+    {state === 'ready' && zoomed && <button className="skymap-reset" onClick={reset}>{resetLabel}</button>}
     {caption && <figcaption>SPHEREx all-sky map (IRSA). Click to zoom in, drag to move.{box ? ' The orange square is the field shown in the viewer.' : ''}</figcaption>}
   </figure>
 }

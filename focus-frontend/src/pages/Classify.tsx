@@ -86,7 +86,8 @@ export default function ClassifyPage(p: Props) {
     if (!pts.length) return null
     const cx = pts.reduce((s, q) => s + q.x_px, 0) / pts.length, cy = pts.reduce((s, q) => s + q.y_px, 0) / pts.length
     const reach = Math.max(...pts.map(q => Math.hypot(q.x_px - cx, q.y_px - cy)))
-    return { cx, cy, half: Math.min(18, Math.max(8, Math.ceil(reach) + 5)) }
+    // At least 25 px (2.5′) across, so a bright source sits inside its surroundings instead of filling the view.
+    return { cx, cy, half: Math.min(20, Math.max(12, Math.ceil(reach) + 6)) }
   }, [candidate, hits])
 
   useEffect(() => { setK(0); setPlaying(true) }, [candidate?.candidate_id])
@@ -207,7 +208,8 @@ export default function ClassifyPage(p: Props) {
           {frame && <FrameCanvas tile={tile} k={frame.cube_index ?? fi} options={{ view, crop }} label={`Close-up, photograph ${k + 1} of ${seq.length}`} />}
           <svg viewBox={`0 0 ${side} ${side}`} aria-hidden="true">{here && ring(...toBox(here.x_px, here.y_px), !here.detected)}</svg>
           <div className="arena-top">
-            <span className="chip">{training ? 'Practice' : tile.manifest.title} · spot {p.candidateNumber}/{total}</span>
+            <span className="chip-stack"><span className="chip">{training ? 'Practice' : tile.manifest.title} · spot {p.candidateNumber}/{total}</span>
+              {candidate.bright_star && <span className="chip warn" title="Saturated and very bright stars leave strong leftovers after subtraction; the computer often flags them by mistake">Next to a very bright star: its glare often fools the computer</span>}</span>
             <div className="segmented small">
               <button className={view === 'residual' ? 'active' : ''} onClick={() => setView('residual')} title="Only what differs from the usual sky glows">Changes</button>
               <button className={view === 'science' ? 'active' : ''} onClick={() => setView('science')} title="The photographs as taken">Photos</button>

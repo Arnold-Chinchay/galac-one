@@ -9,7 +9,7 @@ interface Index { n_regions: number; n_sources: number; n_red?: number; n_cold: 
 
 const TOTAL_REGIONS = 12288
 /** Same test as pipeline/region_analysis.py: a cold dwarf's excess rises from 3.5-4.0 um to 4.4-4.7 um. */
-function risesTo45(s: RedSource): boolean {
+export function risesTo45(s: Pick<RedSource, 'spectrum'>): boolean {
   const at = (lo: number) => s.spectrum?.find(b => Math.abs(b.lam_um[0] - lo) < 1e-6)
   const a = at(3.5), b = at(4.4)
   if (a?.excess_mjy_sr != null && b?.excess_mjy_sr != null) return b.excess_mjy_sr >= 2 * Math.max(a.excess_mjy_sr, 0) && b.excess_mjy_sr > 0

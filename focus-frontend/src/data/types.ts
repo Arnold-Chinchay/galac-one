@@ -29,6 +29,8 @@ export interface Position { frame_id: string; x_px: number; y_px: number; ra_deg
 export interface Candidate {
   candidate_id: string; tile_id: string; grid_id: string; title: string; positions: Position[];
   suggested_label?: Label; catalog_match?: { catalog: string; source_id: string } | null;
+  /** Sits on a saturated or very bright star, whose imperfect subtraction often fools the detector. */
+  bright_star?: boolean;
 }
 export interface Overlay extends Position {
   source_id: string; grid_id: string; catalog: string; reference_epoch?: string;

@@ -478,3 +478,10 @@ dt{font-size:12px}dd{font-size:14px}
 .play-follow .note textarea{min-height:34px}
 @media(max-width:900px){.play-follow{overflow:visible}.play-follow .follow,.play-follow .follow.has-side{height:auto;grid-template-columns:minmax(0,1fr)}
   .play-follow .pick,.play-follow .loop.small,.play-follow .follow-hint,.play-follow .loop-bar{width:100%}.play-follow .follow-results{height:auto}}
+.chip-stack{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.chip.warn{border-color:#ffb454;color:#ffd38a;background:#2a1e0ee6;max-width:330px;white-space:normal;line-height:1.35}
+.hunt-ring{position:absolute;left:50%;top:50%;width:18%;aspect-ratio:1;transform:translate(-50%,-50%);border:2px dashed #78ecdb;border-radius:50%;pointer-events:none;z-index:2;box-shadow:0 0 0 2000px rgba(3,5,10,.18)}
+.hunt-ring b{position:absolute;left:50%;top:-24px;transform:translateX(-50%);font:600 11px/1 Inter,sans-serif;color:#78ecdb;white-space:nowrap;text-shadow:0 1px 4px #000}
+.answer .look{width:46px;height:46px;flex:none}
+@media(max-width:900px){.answer .look{width:36px;height:36px}}
+.hunt-card .skymap-reset{left:auto;bottom:auto;right:10px;top:48px;padding:6px 12px;font-size:12.5px}

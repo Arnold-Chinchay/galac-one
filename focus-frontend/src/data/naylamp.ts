@@ -96,6 +96,31 @@ export function decodeF16(u16: Uint16Array): Float32Array {
   return out
 }
 
+/** Flags candidates sitting on a saturated or very bright star and moves them to the end of the queue, keeping the
+ * order of the rest. Hidden test objects are untouched: only the order changes, never which spots are shown. */
+export function brightLast(cands: Candidate[], cube: Cube): Candidate[] {
+  const size = cube.w * cube.h
+  for (const c of cands) {
+    const pts = c.positions.filter(p => p.detected)
+    const use = pts.length ? pts : c.positions.slice(0, 1)
+    if (!use.length) continue
+    const x0 = Math.round(use.reduce((s, p) => s + p.x_px, 0) / use.length), y0 = Math.round(use.reduce((s, p) => s + p.y_px, 0) / use.length)
+    let hot = 0
+    for (let k = 0; k < cube.n; k++) {
+      let flag = false
+      for (let dy = -1; dy <= 1 && !flag; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const x = x0 + dx, y = y0 + dy
+        if (x < 0 || y < 0 || x >= cube.w || y >= cube.h) continue
+        const v = cube.science[k * size + y * cube.w + x]
+        if (!Number.isFinite(v) || v > cube.stretch.hi) { flag = true; break }
+      }
+      if (flag) hot++
+    }
+    c.bright_star = hot > cube.n * 0.3
+  }
+  return [...cands.filter(c => !c.bright_star), ...cands.filter(c => c.bright_star)]
+}
+
 type Json = <T>(url: string, signal?: AbortSignal) => Promise<T>
 export async function loadNaylampTile(manifestUrl: string, raw: NaylampManifest, json: Json, candidatesUrl: string | null, signal?: AbortSignal): Promise<Tile> {
   const { n_frames: N, height: H, width: W } = raw.shape
@@ -125,7 +150,7 @@ export async function loadNaylampTile(manifestUrl: string, raw: NaylampManifest,
   const frames = toFrames(raw, rawFrames)
   const data: Cube = { n: N, h: H, w: W, science, residual, mjd: Float64Array.from(rawFrames, f => f.mjd), lam: Float32Array.from(rawFrames, f => f.lam_um ?? NaN), stretch: scienceStretch(science) }
   const stretch = { min: data.stretch.lo, max: data.stretch.hi }
-  return { manifest: toManifest(raw, stretch), frames, candidates: toCandidates(raw, rawCandidates || []), gaia: [], known: [], files_url: rel('./'), cube: data }
+  return { manifest: toManifest(raw, stretch), frames, candidates: brightLast(toCandidates(raw, rawCandidates || []), data), gaia: [], known: [], files_url: rel('./'), cube: data }
 }
 
 /** The live Worker answers with counts, not vote ids; a partly ignored batch is resent one vote at a time. */
