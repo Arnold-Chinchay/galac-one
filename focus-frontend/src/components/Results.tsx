@@ -20,7 +20,7 @@ const quantile = (values: number[], q: number) => { const s = [...values].sort((
 const range = (values: number[]) => { const lo = quantile(values, .02), hi = quantile(values, .98), pad = (hi - lo) * .12 || 1; return [lo - pad, hi + pad] as const }
 const fmt = (n: number, digits = 2) => n.toFixed(digits)
 
-function Scatter({ points, colour, line, yLabel, height = 120 }: { points: [number, number, number?][]; colour: (p: [number, number, number?]) => string; line?: (x: number) => number; yLabel: string; height?: number }) {
+export function Scatter({ points, colour, line, yLabel, height = 120 }: { points: [number, number, number?][]; colour: (p: [number, number, number?]) => string; line?: (x: number) => number; yLabel: string; height?: number }) {
   const W = 320, L = 34, R = 6, T = 8, B = 18
   const xs = points.map(p => p[0]), ys = points.map(p => p[1])
   const x0 = Math.min(...xs), x1 = Math.max(...xs), [y0, y1] = range(ys)

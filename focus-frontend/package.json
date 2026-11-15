@@ -12,9 +12,11 @@
     "generate:demo": "node scripts/generate-demo.mjs"
   },
   "dependencies": {
+    "@types/three": "0.170.0",
     "aladin-lite": "3.9.2-beta",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "three": "0.170.0"
   },
   "devDependencies": {
     "@types/react": "^19.1.10",

@@ -95,6 +95,36 @@ async function postVotes(env, request) {
   return json({ ok: true, accepted: valid.length, ignored: votes.length - valid.length, n_votes: me.n_votes, reliability: me.reliability });
 }
 
+// POST /api/reports  { user_id, tile_id, x, y, label, note?, pm_east?, pm_north?, pm_err?, n_detected?, variability? }
+// A source the person chose and followed themselves. Stored for review only; no endpoint lists them back.
+const REPORT_LABELS = new Set(["moving", "variable", "artifact", "unsure", "static"]);
+async function postReport(env, request) {
+  let b;
+  try { b = await request.json(); } catch { return err(400, "invalid json"); }
+  if (typeof b?.user_id !== "string" || !UUID.test(b.user_id)) return err(400, "user_id must be a uuid");
+  if (typeof b.tile_id !== "string" || !/^[\w\-]{1,64}$/.test(b.tile_id)) return err(400, "bad tile_id");
+  if (!REPORT_LABELS.has(b.label)) return err(400, `label must be one of ${[...REPORT_LABELS].join(", ")}`);
+  const num = (v, lo, hi) => (typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : null);
+  const x = num(b.x, -1, 10000), y = num(b.y, -1, 10000);
+  if (x === null || y === null) return err(400, "x and y must be pixel positions");
+  // Printable text only, short: notes are read by the team, never shown to other visitors.
+  const note = typeof b.note === "string" ? b.note.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 280) || null : null;
+  const tile = await env.DB.prepare("SELECT id FROM tiles WHERE id = ?1").bind(b.tile_id).first();
+  if (!tile) return err(400, "unknown tile");
+  const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE user_id = ?1 AND created_at > datetime('now', '-1 hour')").bind(b.user_id).first();
+  if (recent.n >= 60) return err(429, "too many reports in the last hour");
+  await env.DB.batch([
+    env.DB.prepare("INSERT OR IGNORE INTO users (id) VALUES (?1)").bind(b.user_id),
+    env.DB.prepare(
+      `INSERT INTO reports (user_id, tile_id, x, y, label, note, pm_east, pm_north, pm_err, n_detected, variability)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)`
+    ).bind(b.user_id, b.tile_id, x, y, b.label, note, num(b.pm_east, -1e4, 1e4), num(b.pm_north, -1e4, 1e4),
+      num(b.pm_err, 0, 1e4), num(b.n_detected, 0, 1e6), num(b.variability, -1e6, 1e6)),
+  ]);
+  const total = await env.DB.prepare("SELECT COUNT(*) AS n FROM reports").first();
+  return json({ ok: true, reports: total.n });
+}
+
 async function stats(env) {
   const [a, top] = await env.DB.batch([
     env.DB.prepare(
@@ -104,7 +134,10 @@ async function stats(env) {
     env.DB.prepare(
       "SELECT COALESCE(alias,'anonymous') AS alias, n_votes, ROUND(reliability,2) AS reliability FROM users WHERE n_votes > 0 ORDER BY n_votes DESC LIMIT 10"),
   ]);
-  return json({ ...a.results[0], leaderboard: top.results });
+  // The reports table arrives with migration 0004; stats keep working without it.
+  let reports = null;
+  try { reports = (await env.DB.prepare("SELECT COUNT(*) AS n FROM reports").first()).n; } catch { /* not migrated yet */ }
+  return json({ ...a.results[0], reports, leaderboard: top.results });
 }
 
 async function me(env, url) {
@@ -132,6 +165,7 @@ export default {
       if (m) return tileCandidates(env, m[1]);
       if (path === "/api/next") return nextCandidates(env, url);
       if (path === "/api/votes" && request.method === "POST") return postVotes(env, request);
+      if (path === "/api/reports" && request.method === "POST") return postReport(env, request);
       if (path === "/api/stats") return stats(env);
       if (path === "/api/me") return me(env, url);
 

@@ -3,6 +3,7 @@ import type { CommunityStats, Field } from '../data/types'
 import { Icon } from '../components/Icons'
 import SkyMap from '../components/SkyMap'
 import { Logo } from '../components/Brand'
+import IntroSky from '../components/IntroSky'
 
 interface Props { targets: Field[]; community: CommunityStats | null; onOpen: (t: Field) => void; onClassify: (t?: Field) => void; onTraining: () => void }
 interface IntroProps { onEnter: () => void; onTraining: () => void }
@@ -10,6 +11,7 @@ interface IntroProps { onEnter: () => void; onTraining: () => void }
 /** Title screen: the planet, the name and the way in. */
 export function Intro({ onEnter, onTraining }: IntroProps) {
   return <section className="brand-hero">
+    <IntroSky />
     <div className="brand-hero-copy">
       <Logo className="brand-logo" />
       <p>Find what moves and what changes in the infrared sky, with NASA’s SPHEREx telescope and your eyes.</p>

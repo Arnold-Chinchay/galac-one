@@ -80,3 +80,12 @@ export const provider: DataProvider = {
 
 export const userStats = (userId: string, signal?: AbortSignal): Promise<UserStats | null> => fetchUserStats(fullUrl(API), userId, signal).catch(() => null)
 export const communityStats = (signal?: AbortSignal): Promise<CommunityStats | null> => json<CommunityStats>(fullUrl(`${API}/stats`), signal).catch(() => null)
+
+export interface ReportInput { tile_id: string; x: number; y: number; label: string; note?: string; pm_east?: number; pm_north?: number; pm_err?: number; n_detected?: number; variability?: number }
+/** Sends a source the person followed themselves; resolves to the total number of reports, or throws. */
+export async function submitReport(r: ReportInput, userId: string): Promise<number> {
+  const response = await fetch(fullUrl(`${API}/reports`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...r, user_id: userId }) })
+  const body = await response.json().catch(() => null)
+  if (!response.ok || !body?.ok) throw new DataError(typeof body?.error === 'string' ? body.error : `The report could not be sent (${response.status}).`, 'REPORT_FAILED', response.status)
+  return body.reports
+}

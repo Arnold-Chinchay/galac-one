@@ -7,6 +7,8 @@ import { safeRead, safeWrite } from '../lib/storage'
 import { timeColour } from '../lib/render'
 import { Icon } from '../components/Icons'
 import FrameCanvas from '../components/FrameCanvas'
+import Pictogram from '../components/Pictogram'
+import FollowStar from '../components/FollowStar'
 
 const CHOICES: { label: Label; title: string; hint: string }[] = [
   { label: 'moving', title: 'It moves', hint: 'The dot is in a different place over time' },
@@ -21,17 +23,6 @@ const ANSWER: Record<Label, string> = {
   unsure: 'unclear.',
 }
 const INTRO_KEY = 'galac.classify-intro.v1'
-
-/** Small drawings of what each answer looks like over three photographs. */
-function Pictogram({ label }: { label: Label }) {
-  const dot = (cx: number, cy: number, r = 3.2, o = 1) => <circle cx={cx} cy={cy} r={r} fill="#ffb454" opacity={o} />
-  const frames = [0, 1, 2].map(i => <rect key={i} x={1 + i * 22} y={1} width={20} height={20} rx={3} fill="#0b1222" stroke="#2b4056" />)
-  const marks = label === 'moving' ? <>{dot(7, 15)}{dot(33, 11)}{dot(59, 7)}</>
-    : label === 'variable' ? <>{dot(11, 11, 1.8, .55)}{dot(33, 11, 4.4)}{dot(55, 11, 2.6, .8)}</>
-    : label === 'artifact' ? <>{dot(33, 11, 3.6)}</>
-    : <><text x="33" y="15" textAnchor="middle" fontSize="11" fill="#8fa3bb">?</text></>
-  return <svg className="pictogram" viewBox="0 0 66 22" aria-hidden="true">{frames}{marks}</svg>
-}
 
 function Intro({ onPractice, onStart }: { onPractice: () => void; onStart: () => void }) {
   const steps: [string, string, ReactNode][] = [
@@ -62,6 +53,7 @@ export default function ClassifyPage(p: Props) {
   const { tile, candidate, training } = p
   const [intro, setIntro] = useState(() => !safeRead<boolean>(INTRO_KEY, false))
   const [view, setView] = useState<'residual' | 'science'>('residual')
+  const [mode, setMode] = useState<'spots' | 'follow'>('spots')
   const [k, setK] = useState(0), [playing, setPlaying] = useState(true), [delay, setDelay] = useState(450)
   const closeIntro = () => { safeWrite(INTRO_KEY, true); setIntro(false) }
 
@@ -134,13 +126,17 @@ export default function ClassifyPage(p: Props) {
 
   return <div className="classify2">
     {intro && <Intro onPractice={() => { closeIntro(); if (!training) p.onTraining() }} onStart={() => { closeIntro(); if (training) p.onRealData() }} />}
+    <div className="mode-switch" role="tablist" aria-label="How to help">
+      <button role="tab" aria-selected={mode === 'spots'} className={mode === 'spots' ? 'active' : ''} onClick={() => setMode('spots')}><strong>Check the computer’s spots</strong><small>Quick yes/no style answers on dots it flagged</small></button>
+      <button role="tab" aria-selected={mode === 'follow'} className={mode === 'follow' ? 'active' : ''} onClick={() => setMode('follow')}><strong>Follow your own star</strong><small>Pick any dot or area; we measure it and you report</small></button>
+    </div>
     <nav className="field-chips" aria-label="Fields to classify">
       <button className={training ? 'active practice' : 'practice'} onClick={p.onTraining}><Icon name="play" size={12} />Practice</button>
       {fields.map(t => <button key={t.tile_id} className={!training && tile.manifest.tile_id === t.tile_id ? 'active' : ''} onClick={() => p.onField(t)}>{t.title}</button>)}
       <button className="text-button how" onClick={() => setIntro(true)}><Icon name="help" size={14} />How it works</button>
     </nav>
 
-    <div className="classify2-grid">
+    {mode === 'follow' ? <FollowStar tile={tile} /> : <div className="classify2-grid">
       <section className="stage" aria-label="Close-up of the flagged spot">
         <div className="stage-head">
           <div><span className="eyebrow">{training ? 'PRACTICE · SYNTHETIC SKY WITH ANSWERS' : `${tile.manifest.title.toUpperCase()} · REAL SPHEREx DATA`}</span>
@@ -229,6 +225,6 @@ export default function ClassifyPage(p: Props) {
           ? 'Practice examples come from a synthetic sky processed by the same pipeline. Nothing here is sent anywhere.'
           : 'We never say whether one answer was right: some spots are hidden tests. Answers are anonymous. Keys: 1–4 answer, Space play/pause, ← → step, Enter next.'}</p>
       </aside>
-    </div>
+    </div>}
   </div>
 }

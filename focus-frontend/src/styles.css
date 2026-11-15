@@ -310,3 +310,42 @@ dt{font-size:12px}dd{font-size:14px}
 .next-label{font-size:13px!important;color:#eaf0ff!important;margin-top:8px!important}
 .next-fields{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 @media(max-width:560px){.tally{grid-template-columns:repeat(2,1fr)}}
+
+/* Classify modes and Follow your own star */
+.mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mode-switch button{text-align:left;padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:#b8c5d9}
+.mode-switch button strong{display:block;font-size:16px;color:#eaf0ff}
+.mode-switch button small{display:block;font-size:12.5px;color:#8fa3bb;margin-top:3px}
+.mode-switch button.active{border-color:var(--cyan);background:#12282c}
+.mode-switch button.active strong{color:var(--cyan)}
+.follow{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}
+.follow.has-side{grid-template-columns:minmax(0,1.35fr) minmax(300px,1fr)}
+.follow-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:14px}
+.pick{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid #1e2b40;cursor:crosshair;touch-action:none;user-select:none}
+.pick canvas,.pick svg{position:absolute;inset:0;width:100%;height:100%}
+.loop.small{max-width:none}
+.follow-hint{aspect-ratio:1;border:1px dashed #2b4056;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#6f88a8;font-size:14px}
+.measure{border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#0a1222}
+.measure.yes{border-color:#2f6d66}
+.measure strong{display:block;font-size:18px;color:#eaf0ff;margin:4px 0}
+.measure.yes strong{color:var(--cyan)}
+.measure p{font-size:13.5px;line-height:1.6;color:#a9b8cf;margin:6px 0 0}
+.follow-results h2{font-size:20px;margin:6px 0 12px}
+.follow-results h2:not(:first-child){margin-top:20px}
+.choices.compact{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choices.compact .choice{padding:10px}
+.choices.compact .choice .pictogram{width:60px}
+.choices.compact .choice strong{font-size:14px}
+.note{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#a9b8cf;margin-top:12px}
+.note textarea{background:#080f1d;color:#eaf0ff;border:1px solid var(--border);border-radius:8px;padding:8px;font:inherit;font-size:14px;resize:vertical}
+.finds{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.finds li{display:grid;grid-template-columns:60px 1fr auto;gap:10px;align-items:center;font-size:13px;color:#a9b8cf}
+.finds strong{color:#eaf0ff}.finds small{color:#6f88a8}
+@media(max-width:900px){.follow,.follow.has-side,.mode-switch{grid-template-columns:minmax(0,1fr)}.follow-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Title screen: twinkling stars and the turning planet */
+.intro-stars{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.intro-planet{position:absolute;pointer-events:none}
+.intro-planet canvas{display:block;width:100%;height:100%}
+.brand-hero-copy,.brand-hero-credit{z-index:2}
+@media(max-width:900px){.follow.has-side{grid-template-columns:minmax(0,1fr)}.follow-grid{grid-template-columns:minmax(0,1fr)}}
