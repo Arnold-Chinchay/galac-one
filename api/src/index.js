@@ -221,7 +221,7 @@ async function me(env, url) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
@@ -245,13 +245,19 @@ export default {
       if (path === "/api/me") return me(env, url);
 
       if (path.startsWith("/tiles/")) {
+        // Tile files are read from R2 once per data centre and then served from Cloudflare's cache.
+        const cache = caches.default, key = new Request(url.origin + path);
+        const hit = await cache.match(key);
+        if (hit) return hit;
         const obj = await env.TILES.get(decodeURIComponent(path.slice(1)));
         if (!obj) return err(404, "not found");
         const headers = new Headers(CORS);
         obj.writeHttpMetadata(headers);
         headers.set("etag", obj.httpEtag);
-        headers.set("cache-control", "public, max-age=3600");
-        return new Response(obj.body, { headers });
+        headers.set("cache-control", "public, max-age=86400, stale-while-revalidate=604800");
+        const res = new Response(obj.body, { headers });
+        ctx?.waitUntil(cache.put(key, res.clone()));
+        return res;
       }
       if (path.startsWith("/api/")) return err(404, "not found");
     } catch (e) {

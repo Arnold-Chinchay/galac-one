@@ -122,12 +122,12 @@ export function brightLast(cands: Candidate[], cube: Cube): Candidate[] {
 }
 
 type Json = <T>(url: string, signal?: AbortSignal) => Promise<T>
-export async function loadNaylampTile(manifestUrl: string, raw: NaylampManifest, json: Json, candidatesUrl: string | null, signal?: AbortSignal): Promise<Tile> {
+export async function loadNaylampTile(manifestUrl: string, raw: NaylampManifest, json: Json, candidatesUrl: string | null, signal?: AbortSignal, early?: Map<string, Promise<Response>>): Promise<Tile> {
   const { n_frames: N, height: H, width: W } = raw.shape
   if (!(N > 0 && H > 0 && W > 0 && N * H * W <= 4e7)) throw new Error('This tile has invalid dimensions.')
   const rel = (name: string) => new URL(name, manifestUrl).href
   const cube = async (name: string) => {
-    const response = await fetch(rel(name), { signal })
+    const response = await (early?.get(name) ?? fetch(rel(name), { signal }))
     if (!response.ok) throw new Error(`Image cube ${name} could not be loaded (${response.status}).`)
     const buffer = await response.arrayBuffer()
     if (buffer.byteLength !== N * H * W * 2) throw new Error(`Image cube ${name} does not match the manifest dimensions.`)
@@ -135,11 +135,15 @@ export async function loadNaylampTile(manifestUrl: string, raw: NaylampManifest,
   }
   const candidateList = async () => {
     // A field the sky search has just published is not in the database until its first vote: read its own list then.
-    if (candidatesUrl) try { const c = (await json<{ candidates: NaylampCandidate[] }>(candidatesUrl, signal)).candidates; if (c?.length) return c } catch (e) { if (signal?.aborted) throw e }
+    if (candidatesUrl) try {
+      const pre = early?.get(candidatesUrl)
+      const c = (pre ? await pre.then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<{ candidates: NaylampCandidate[] }> }) : await json<{ candidates: NaylampCandidate[] }>(candidatesUrl, signal)).candidates
+      if (c?.length) return c
+    } catch (e) { if (signal?.aborted) throw e }
     return json<NaylampCandidate[]>(rel('candidates.json'), signal).catch(e => { if (signal?.aborted) throw e; return [] })
   }
   const [rawFrames, science, residual, rawCandidates] = await Promise.all([
-    json<NaylampFrame[]>(rel('frames.json'), signal), cube('science.f16.bin'), cube('residuals.f16.bin'), candidateList(),
+    early?.get('frames.json') ? early.get('frames.json')!.then(r => { if (!r.ok) throw new Error(`frames.json could not be loaded (${r.status}).`); return r.json() as Promise<NaylampFrame[]> }) : json<NaylampFrame[]>(rel('frames.json'), signal), cube('science.f16.bin'), cube('residuals.f16.bin'), candidateList(),
   ])
   if (!Array.isArray(rawFrames) || rawFrames.length !== N) throw new Error('Frame count does not match the manifest.')
   // Cubes are stored south-up; flip each frame once so row 0 is north everywhere in the viewer.

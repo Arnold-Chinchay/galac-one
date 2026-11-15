@@ -62,9 +62,15 @@ export const provider: DataProvider = {
     if (!record?.manifest_url) throw new DataError('No prepared observation set for this field.', 'NOT_FOUND', 404)
     const cached = tiles.get(record.tile_id)
     if (cached) return cached
+    // Every file of the field starts downloading now, in parallel with its manifest.
+    const early = new Map(['science.f16.bin', 'residuals.f16.bin', 'frames.json'].map(n => {
+      const p = fetch(new URL(n, record.manifest_url).href, { signal }); p.catch(() => {}); return [n, p] as const
+    }))
+    const spots = fullUrl(`${API}/tiles/${encodeURIComponent(record.tile_id)}/candidates`)
+    early.set(spots, fetch(spots, { signal })); early.get(spots)!.catch(() => {})
     const manifest = await json<unknown>(record.manifest_url, signal)
     if (!isNaylampManifest(manifest) || manifest.id !== record.tile_id) throw new DataError('The returned package does not belong to this field.', 'TILE_MISMATCH')
-    const tile = await loadNaylampTile(record.manifest_url, manifest, json, fullUrl(`${API}/tiles/${encodeURIComponent(record.tile_id)}/candidates`), signal)
+    const tile = await loadNaylampTile(record.manifest_url, manifest, json, fullUrl(`${API}/tiles/${encodeURIComponent(record.tile_id)}/candidates`), signal, early)
     tiles.set(record.tile_id, tile)
     while (tiles.size > 3) tiles.delete(tiles.keys().next().value!)
     return tile
