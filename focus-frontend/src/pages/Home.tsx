@@ -56,7 +56,8 @@ export default function Home({ targets, community, onOpen, onClassify, onTrainin
     <aside className="sky-panel">
       {!picked ? <>
         <h1>See what <em>moves</em> in the infrared sky.</h1>
-        <p>This is the whole sky as NASA’s SPHEREx telescope sees it. Click anywhere to zoom in. Where we stacked every SPHEREx exposure, the sky turns sharp. Pick one of the five fields we studied:</p>
+        <p>This is the whole sky as NASA’s SPHEREx telescope sees it. Click anywhere to zoom in. Pick one of the five fields we studied:</p>
+        <div className="sky-legend"><span><i className="sw public" />SPHEREx public map</span><span><i className="sw stacked" />Stacked by us: sharper, true colour</span></div>
         <ul className="field-list">{targets.map(t => <li key={t.tile_id}><button onClick={() => setPickedTitle(t.title)}>
           <span>{t.title}</span><small>{t.kind === 'moving' ? 'moves' : 'changes brightness'}</small><Icon name="arrow" size={15} />
         </button></li>)}</ul>

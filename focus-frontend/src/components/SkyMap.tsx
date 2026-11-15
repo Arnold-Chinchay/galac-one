@@ -64,15 +64,15 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
         if (allSky) { try { if (want) al.hideCooGrid(); else al.showCooGrid() } catch { /* no grid API */ } }
       }
       try { hips.setColormap('inferno', { stretch: 'asinh' }) } catch { /* older builds: keep grey */ }
-      // Our stacks remove the sky background (black), so drawn on top they would paint the map black as coverage grows.
-      // From afar they are added to the map instead: black adds nothing, their stars add light. Close up they replace it.
+      // Our stacks are drawn over the public map so it is clear what has been stacked. Their sky background is
+      // removed (black); from afar it is lifted a little so stacked areas read as a dark starfield, not a hole.
       const deeps: any[] = []
-      let added: boolean | null = null
+      let lifted: boolean | null = null
       const fade = (fov: number) => {
-        const want = fov > 1
-        if (want === added) return
-        added = want
-        deeps.forEach(d => { try { d.setBlendingConfig(want) } catch { /* older builds */ } })
+        const want = fov > 3
+        if (want === lifted) return
+        lifted = want
+        deeps.forEach(d => { try { d.setBrightness(want ? 0.07 : 0) } catch { /* older builds */ } })
       }
       mosaics?.forEach((url, i) => {
         const deep = A.HiPS(url, { name: 'mosaic-' + i, imgFormat: 'png' })
