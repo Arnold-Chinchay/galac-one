@@ -1,0 +1,126 @@
+# Grows the deep-sky layer on its own: every few hours it stacks the next regions (new NASA frames first, then new sky).
+name: sky-crawler
+
+on:
+  schedule:
+    - cron: "17 */4 * * *"
+  workflow_dispatch:
+    inputs:
+      regions:
+        description: "How many regions this run"
+        default: "30"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sky-crawler
+  cancel-in-progress: false
+
+env:
+  HF_REPO: naylamp-space/spherex-deep-sky
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+      count: ${{ steps.m.outputs.count }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install numpy scipy astropy astropy-healpix huggingface_hub --quiet
+      - name: Image index and region state
+        run: |
+          mkdir -p cache/merged
+          gh release download index-dr1 -p dr1_index.csv.gz -D cache/merged
+          gh release download index-qr3 -p qr3_index.csv.gz -D cache/merged
+          python -c 'from huggingface_hub import hf_hub_download as d; import shutil
+          try: shutil.copyfile(d("${{ env.HF_REPO }}", "state/regions.json", repo_type="dataset"), "state.json")
+          except Exception as e: print("no state yet:", e)'
+      - id: m
+        run: |
+          python -m pipeline.sky_queue plan --index cache/merged/*.csv.gz --state state.json --k ${{ inputs.regions || 30 }} --out plan.json
+          python -c 'import json; p = json.load(open("plan.json")); print("matrix=" + json.dumps({"r": p})); print(f"count={len(p)}")' >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with: { name: plan, path: plan.json, retention-days: 3 }
+
+  region:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      R: ${{ matrix.r.region }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r pipeline/requirements.txt --quiet
+      - name: Image index
+        run: |
+          mkdir -p cache/merged
+          gh release download index-dr1 -p dr1_index.csv.gz -D cache/merged
+          gh release download index-qr3 -p qr3_index.csv.gz -D cache/merged
+      - name: Stack every cell of the region
+        run: |
+          python -m pipeline.mosaic cells --ra ${{ matrix.r.ra }} --dec ${{ matrix.r.dec }} --size 2.6 --step 0.34 \
+            | python -c 'import json, sys; [print(c["name"], c["ra"], c["dec"]) for c in json.load(sys.stdin)]' > cells.txt
+          cell() {
+            set -e
+            n="$R-$1"
+            python -m pipeline.fetch_tile --ra "$2" --dec "$3" --name "$n" --fov 0.45 --workers 16 --via s3 --source index --index cache/merged/*.csv.gz > "log-$1.txt" 2>&1
+            python -m pipeline.deep --name "$n" --size 0.4 --oversample 2 --method drizzle --procs 2 >> "log-$1.txt" 2>&1
+            mkdir -p "cells/$1" && cp cache/tiles/$n/deep/deep.json cache/tiles/$n/deep/deep_*.f16.bin "cells/$1/"
+            rm -rf "cache/tiles/$n"
+          }
+          export -f cell
+          xargs -P 2 -L 1 bash -c 'cell "$@" || echo "cell $1 failed"' _ < cells.txt
+          echo "cells stacked: $(ls cells | wc -l) of $(wc -l < cells.txt)"
+      - name: Join and cut HiPS
+        run: python -m pipeline.mosaic join --ra ${{ matrix.r.ra }} --dec ${{ matrix.r.dec }} --size 2.6 --cells cells --out out
+      - uses: actions/upload-artifact@v4
+        with: { name: "hips-${{ matrix.r.region }}", path: out/hips/, retention-days: 3 }
+
+  publish:
+    needs: [plan, region]
+    if: always() && needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    concurrency:
+      group: deep-sky-layer
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r pipeline/requirements.txt huggingface_hub --quiet
+      - uses: actions/download-artifact@v4
+        with: { pattern: "hips-*", path: built }
+      - uses: actions/download-artifact@v4
+        with: { name: plan, path: . }
+      - name: Region state
+        run: |
+          mkdir -p cache/merged
+          gh release download index-dr1 -p dr1_index.csv.gz -D cache/merged
+          gh release download index-qr3 -p qr3_index.csv.gz -D cache/merged
+          python -c 'from huggingface_hub import hf_hub_download as d; import shutil
+          try: shutil.copyfile(d("${{ env.HF_REPO }}", "state/regions.json", repo_type="dataset"), "state.json")
+          except Exception as e: print("no state yet:", e)'
+          python -c 'import json, os; p = json.load(open("plan.json")); json.dump([r for r in p if os.path.isdir("built/hips-" + r["region"])], open("done.json", "w"))'
+          python -m pipeline.sky_queue record --index cache/merged/*.csv.gz --state state.json --regions done.json
+      - name: Add to the layer on Hugging Face
+        run: |
+          ls -d built/hips-* > /dev/null 2>&1 || { echo "nothing built"; exit 0; }
+          python -m pipeline.sky_publish --repo ${{ env.HF_REPO }} --hips built/hips-* --state state.json --message "Add $(ls -d built/hips-* | wc -l) regions"

@@ -10,6 +10,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 
 BANDS = ("red", "green", "blue")
+STRETCH = {"red": (0.0204, 7.19), "green": (0.0443, 17.6), "blue": (0.0512, 19.6)}
 
 
 def cells(ra: float, dec: float, size: float, step: float) -> list[dict]:
@@ -78,14 +79,13 @@ def join(cell_dirs: list[Path], ra: float, dec: float, size: float, out: Path) -
         cover = foot if cover is None else np.minimum(cover, foot)
         print(b, "cells", len(data), "pixels", n, flush=True)
 
-    # One stretch for the whole region: per-cell stretches are what makes patches visible.
+    # One fixed stretch for the whole sky (MJy/sr, measured on the Barnard mosaic): regions built on different
+    # days then meet without seams. Values are (noise, bright level) per band.
     chans = []
     for b in BANDS:
         d = fill_saturated(mosaic[b].copy())
-        valid = d[cover > 0]
-        noise = 1.4826 * np.median(np.abs(valid - np.median(valid)))
-        top = np.percentile(valid, 99.8)
-        x = np.arcsinh(np.clip(d - np.median(valid), 0, None) / (3 * noise)) / np.arcsinh(max(top, 1e-6) / (3 * noise))
+        noise, top = STRETCH[b]
+        x = np.arcsinh(np.clip(d, 0, None) / (3 * noise)) / np.arcsinh(top / (3 * noise))
         chans.append(np.clip(x, 0, 1))
     rgb = np.stack(chans, axis=-1)
     # Alpha fades the outer edge of the region into the all-sky map instead of cutting it.

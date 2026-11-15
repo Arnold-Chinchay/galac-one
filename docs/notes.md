@@ -60,6 +60,16 @@ Las estrellas brillantes saturan: hay que usar alas o halo. La astrometría de G
 - Almacenamiento: R2 (10 GB) para lo de cada visita; Hugging Face Datasets para la capa grande; Zenodo (50 GB, DOI) para la publicación final. Google Drive no sirve.
 - Token de Hugging Face: fine-grained con permiso de escritura sobre la organización `naylamp-space`; está como secreto `HF_TOKEN` del repo y con sesión en la laptop (`.venv/Scripts/hf.exe auth whoami`).
 
+## Cielo entero automático (`sky-crawler`, corre solo en GitHub)
+- **Qué hace:** cada 4 h (cron `17 */4 * * *`, también a mano con `gh workflow run sky-crawler.yml -f regions=N`) apila las siguientes ~30 regiones del cielo y las suma a la capa de Hugging Face `naylamp-space/spherex-deep-sky` (`hips/deep-sky`), que es la que muestra la web. No necesita la laptop.
+- **Regiones** = píxeles HEALPix de orden 5 (12 288, ~1.83°); cada una se procesa como mosaico de 2.6° (8×8 = 64 celdas de 0.4°, 2 a la vez por máquina, máx. 16 máquinas) para no dejar huecos donde se juntan 4 regiones.
+- **Cola** (`pipeline/sky_queue.py`): cuenta los cuadros que tocan cada región con el índice de S3 (releases `index-dr1`, `index-qr3`; este último se renueva cada lunes con `build-index`). Prioridad: 1) regiones ya hechas con ≥15 % más cuadros que cuando se hicieron (datos nuevos de la NASA); 2) regiones nuevas más cercanas a lo ya hecho. Estado en el dataset: `state/regions.json` (`{pix: {frames, mjd}}`).
+- **Publicar** (`pipeline/sky_publish.py`): baja de HF solo las teselas que tocan las regiones nuevas, las funde (`mosaic merge`) y sube esas mismas; luego actualiza el estado. El trabajo `publish` tiene `concurrency` para que dos corridas no se pisen.
+- **Color fijo** para todo el cielo (`STRETCH` en `pipeline/mosaic.py`, medido en Barnard), así las regiones hechas en días distintos no muestran costuras. Los 5 mosaicos de 2° se rehicieron con él y son la capa base (300 teselas, 15 regiones marcadas como hechas).
+- Tiempos medidos por celda: ~1.3 min bajando de S3 + ~0.9 min apilando. Ritmo esperado ~150-200 regiones/día; primera pasada del cielo en ~2 meses, luego solo re-apila lo que recibe datos nuevos. Más rápido a futuro: procesar por cuadro (cada cuadro una sola vez) en vez de por celda.
+- **Cómo revisar:** `gh run list --workflow sky-crawler.yml`; el resumen de `plan` dice cuántas regiones van hechas. Si una corrida falla, mirar el log del trabajo `region` (cada celda deja `log-cXY.txt`, que no se sube) o del `publish`.
+- **Pausar:** `gh workflow disable sky-crawler.yml` (reanudar con `enable`).
+
 ## Pendiente
 - Verificar el movimiento propio de WISE 0855 con CatWISE cuando IRSA TAP funcione; corregir su paralaje.
 - Medir completitud con más inyecciones y más campos; interfaz de front.
