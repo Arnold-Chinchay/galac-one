@@ -1,6 +1,12 @@
 name = "naylamp-space"
 main = "api/src/index.js"
 compatibility_date = "2026-11-01"
+# The site also answers on the team domain (zone on Cloudflare). Listing routes turns workers.dev off unless it is kept explicitly.
+workers_dev = true
+routes = [
+  { pattern = "naylamspace.earth", custom_domain = true },
+  { pattern = "www.naylamspace.earth", custom_domain = true },
+]
 
 # The built front (focus-frontend/dist) is served by the same Worker; /api/* and /tiles/* are handled in code.
 [assets]
