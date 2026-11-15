@@ -20,7 +20,7 @@ const sources: [string, string, string][] = [
   ['SPHEREx on AWS Open Data', 'The public bucket the pipeline reads spectral images from.', 'https://registry.opendata.aws/spherex-qr/'],
   ['Gaia DR3', 'Reference positions and proper motions of the targets.', 'https://www.cosmos.esa.int/web/gaia/dr3'],
   ['Astropy, reproject, astroquery', 'FITS, coordinates, reprojection and archive access in the pipeline.', 'https://www.astropy.org/'],
-  ['Source code', 'Pipeline, API and this site, MIT licence.', 'https://github.com/spacenaylamp-blip/naylam_space'],
+  ['Source code', 'Pipeline, API and this site, MIT licence.', 'https://github.com/spacenaylamp-blip/galac-one'],
   ['Planet X and SPHEREx challenge', 'NASA Space Apps 2026.', 'https://www.spaceappschallenge.org/2026/challenges/planet-x-and-spherex/'],
 ]
 
