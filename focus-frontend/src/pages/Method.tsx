@@ -71,7 +71,7 @@ export default function Method({ community, onClassify }: { community: Community
     </section>
     <section className="sources-section"><h2>Data and tools</h2>
       <div className="sources-list">{sources.map(([title, description, url]) => <a key={title} href={url} target="_blank" rel="noreferrer"><div><strong>{title}</strong><p>{description}</p></div><Icon name="external" size={18} /></a>)}</div>
-      <p>Site built with React, TypeScript and Vite, served with the API from Cloudflare Workers, D1 and R2. Typography: Geist, Inter and IBM Plex Mono (SIL Open Font License). Naylamp Space is an independent team from Piura, Peru; this is not an official NASA or IRSA product.</p>
+      <p>Site built with React, TypeScript and Vite, served with the API from Cloudflare Workers, D1 and R2. Typography: Jost, Geist, Inter and IBM Plex Mono (SIL Open Font License). Title-screen planet: artist’s concept, Caltech/R. Hurt (IPAC); it is an illustration, not an observation. Naylamp Space is an independent team from Piura, Peru; this is not an official NASA or IRSA product.</p>
     </section>
     <section className="acknowledgement"><span className="eyebrow">SPHEREx ACKNOWLEDGEMENT</span><p>This publication makes use of data products from the Spectro-Photometer for the History of the Universe, Epoch of Reionization and Ices Explorer (SPHEREx), which is a joint project of the Jet Propulsion Laboratory and the California Institute of Technology, and is funded by the National Aeronautics and Space Administration.</p><a href="https://irsa.ipac.caltech.edu/Missions/spherex.html" target="_blank" rel="noreferrer">SPHEREx at IRSA <Icon name="external" size={13} /></a></section>
   </div>

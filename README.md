@@ -1,4 +1,6 @@
-# Naylamp Space
+# GALAC ONE
+
+*Explore · Observe · Discover.* A tool by the Naylamp Space team (Piura, Peru).
 
 Crowd-calibrated search for moving and changing objects in SPHEREx data. NASA Space Apps 2026, challenge "Planet X and SPHEREx".
 
@@ -11,7 +13,7 @@ SPHEREx sees each point of the sky at a different wavelength in every frame, so 
 |---|---|
 | `pipeline/` | Python: index of the S3 bucket, cutout download, alignment, spectral subtraction, detection, tile export |
 | `api/`, `wrangler.toml` | Cloudflare Worker: API, static web and tile files (D1 + R2) |
-| `web/public/` | Static web and the synthetic demo tile |
+| `focus-frontend/` | The GALAC ONE site (React + Vite), built to `focus-frontend/dist` and served by the Worker |
 | `migrations/` | D1 schema |
 | `tests/` | Synthetic validation of the spectral subtraction |
 | `docs/` | `frontend.md` (API and data format), `notes.md` (technical notes and findings) |

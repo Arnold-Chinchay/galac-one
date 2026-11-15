@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CommunityStats, Field } from '../data/types'
 import { Icon } from '../components/Icons'
 import SkyMap from '../components/SkyMap'
+import { Logo } from '../components/Brand'
 
 interface Props { targets: Field[]; community: CommunityStats | null; onOpen: (t: Field) => void; onClassify: (t?: Field) => void; onTraining: () => void }
 
@@ -23,7 +24,19 @@ export default function Home({ targets, community, onOpen, onClassify, onTrainin
   const picked = targets.find(t => t.title === pickedTitle) ?? null
   const marks = targets.map(t => ({ id: t.tile_id, title: t.title, ra: t.center.ra_deg, dec: t.center.dec_deg }))
 
-  return <section className="sky-home">
+  return <>
+  <section className="brand-hero">
+    <div className="brand-hero-copy">
+      <Logo className="brand-logo" />
+      <p>Find what moves and what changes in the infrared sky, with NASA’s SPHEREx telescope and your eyes.</p>
+      <div className="brand-hero-actions">
+        <a className="button primary large" href="#sky">Enter the sky <Icon name="arrow" size={18} /></a>
+        <button className="text-button" onClick={onTraining}>Practice first</button>
+      </div>
+    </div>
+    <small className="brand-hero-credit">Artist’s concept of a distant planet, not SPHEREx data. Image: Caltech/R. Hurt (IPAC).</small>
+  </section>
+  <section className="sky-home" id="sky">
     <SkyMap ra={180} dec={0} fovDeg={360} allSky height="100%" caption={false} marks={marks} inset={392}
       focus={picked ? { ra: picked.center.ra_deg, dec: picked.center.dec_deg } : null}
       mosaics={[DEEP_SKY]}
@@ -51,4 +64,5 @@ export default function Home({ targets, community, onOpen, onClassify, onTrainin
       </>}
     </aside>
   </section>
+  </>
 }
