@@ -5,6 +5,7 @@ import SkyMap from '../components/SkyMap'
 import { Logo } from '../components/Brand'
 import IntroSky from '../components/IntroSky'
 import SkySearch from '../components/SkySearch'
+import CommunityLeads from '../components/CommunityLeads'
 
 interface Props { targets: Field[]; community: CommunityStats | null; onOpen: (t: Field) => void; onClassify: (t?: Field) => void; onTraining: () => void }
 interface IntroProps { onEnter: () => void; onTraining: () => void }
@@ -63,6 +64,7 @@ export default function Home({ targets, community, onOpen, onClassify, onTrainin
         <button className="button primary large" onClick={() => onClassify()}>Help find moving objects <Icon name="arrow" size={18} /></button>
         <button className="text-button" onClick={onTraining}>Practice first, with answers shown</button>
         <p className="sky-stats">{community ? `${community.candidates} candidates · ${community.votes} classifications so far` : 'Open to everyone. No account needed.'}</p>
+        <CommunityLeads onFocus={(ra, dec) => setSpot({ ra, dec })} />
         <SkySearch onFocus={(ra, dec) => setSpot({ ra, dec })} onCandidates={c => setCold(c.map(s => ({ ra: s.ra, dec: s.dec })))} />
       </> : <>
         <button className="text-button back" onClick={() => setPickedTitle(null)}><Icon name="back" size={15} />All fields</button>

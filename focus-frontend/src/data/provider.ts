@@ -105,5 +105,14 @@ export async function submitSkyVote(v: { source_key: string; ra: number; dec: nu
   const body = await response.json().catch(() => null)
   if (!response.ok || !body?.ok) throw new DataError(typeof body?.error === 'string' ? body.error : `Not saved (${response.status}).`, 'SKY_VOTE_FAILED', response.status)
 }
-export const skyCounts = (region: string, signal?: AbortSignal): Promise<SkyCounts> =>
-  json<{ counts: SkyCounts }>(fullUrl(`${API}/sky-votes?region=${encodeURIComponent(region)}`), signal).then(r => r.counts ?? {}).catch(() => ({}))
+export type SkyStatus = Record<string, 'lead' | 'rejected' | 'open'>
+/** Answers on a region's sources, and what the community has decided on each (weighted by reliability). */
+export const skyCounts = (region: string, signal?: AbortSignal): Promise<{ counts: SkyCounts; status: SkyStatus }> =>
+  json<{ counts: SkyCounts; status?: SkyStatus }>(fullUrl(`${API}/sky-votes?region=${encodeURIComponent(region)}`), signal)
+    .then(r => ({ counts: r.counts ?? {}, status: r.status ?? {} })).catch(() => ({ counts: {}, status: {} }))
+interface Lead { id: string; voters: number; share: number | null; status: 'lead' }
+export interface Consensus {
+  spots: { leads: (Lead & { field: string; tile_id: string; x: number; y: number; label: string })[]; n_lead: number; n_rejected: number; n_open: number }
+  sky: { leads: (Lead & { ra: number; dec: number })[]; n_lead: number; n_rejected: number; n_open: number }
+}
+export const communityConsensus = (signal?: AbortSignal) => json<Consensus>(fullUrl(`${API}/consensus`), signal)

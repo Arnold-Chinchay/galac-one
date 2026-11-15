@@ -2,7 +2,7 @@
 // in the deep image and say what it is. New regions join the queue on their own as the sky grows.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { skyCounts, submitSkyVote } from '../data/provider'
-import type { SkyCounts, SkyLabel } from '../data/provider'
+import type { SkyCounts, SkyLabel, SkyStatus } from '../data/provider'
 import { anonymousId, safeRead, safeWrite } from '../lib/storage'
 import { Icon } from './Icons'
 import SkyMap from './SkyMap'
@@ -37,6 +37,8 @@ function Look({ label }: { label: SkyLabel }) {
 }
 /** Most promising first: cold-dwarf colours, then excess rising toward 4.5 µm; huge excesses (bright-star leftovers) last. */
 const rank = (h: Source) => (h.y_dwarf_like ? 0 : risesTo45(h) ? 1 : 2) + (h.excess_snr > 150 ? 3 : 0)
+/** 0: the community confirmed a red dot, 1: someone saw one, 2: no answers pointing that way yet. */
+const heard = (h: { key: string }, c: SkyCounts, st: SkyStatus) => st[h.key] === 'lead' ? 0 : (c[h.key]?.red ?? 0) > 0 ? 1 : 2
 export const sourceKey = (region: string, ra: number, dec: number) => `${region}:${ra.toFixed(4)}:${dec.toFixed(4)}`
 
 /** How much redder than the stars it is, band by band: the cold-dwarf signature is a bar chart rising to the right. */
@@ -51,6 +53,7 @@ export default function SkyHunt({ onAnswered, alias }: { onAnswered: (cold: bool
   const [regions, setRegions] = useState<string[] | null>(null)
   const [queue, setQueue] = useState<Hit[]>([])
   const [counts, setCounts] = useState<SkyCounts>({})
+  const [status, setStatus] = useState<SkyStatus>({})
   const [done, setDone] = useState<Record<string, SkyLabel>>(() => safeRead(DONE_KEY, {}))
   const [picked, setPicked] = useState<SkyLabel | null>(null), [error, setError] = useState('')
   const [tried, setTried] = useState<string[]>([]), [loading, setLoading] = useState(false)
@@ -71,13 +74,15 @@ export default function SkyHunt({ onAnswered, alias }: { onAnswered: (cold: bool
     Promise.all([
       fetch(`${HF}/analysis/regions/${next}.json`, { referrerPolicy: 'no-referrer' }).then(r => r.ok ? r.text() : '{}'),
       skyCounts(next),
-    ]).then(([text, c]) => {
+    ]).then(([text, { counts: c, status: st }]) => {
       const file = JSON.parse(text.replace(/\bNaN\b/g, 'null')) as { sources?: Source[] }
       // Only sources inside the region itself: just outside it the deep image has not been stacked yet.
       const pix = Number(next.slice(1))
       const hits = (file.sources ?? []).filter(s => pixNest(5, s.ra, s.dec) === pix).map(s => ({ ...s, region: next, key: sourceKey(next, s.ra, s.dec) }))
-        .filter(h => !done[h.key]).sort((a, b) => rank(a) - rank(b) || b.excess_snr - a.excess_snr).slice(0, 12)
-      setCounts(prev => ({ ...prev, ...c }))
+        .filter(h => !done[h.key] && st[h.key] !== 'rejected')
+        // Community answers come first: confirmed red dots, then sources someone already called red, then the search's own order.
+        .sort((a, b) => heard(a, c, st) - heard(b, c, st) || rank(a) - rank(b) || b.excess_snr - a.excess_snr).slice(0, 12)
+      setCounts(prev => ({ ...prev, ...c })); setStatus(prev => ({ ...prev, ...st }))
       setQueue(q => [...q, ...hits])
     }).catch(() => {}).finally(() => { busy.current = false; setLoading(false) })
   }, [regions, queue.length, tried.length, loading])
@@ -129,6 +134,7 @@ export default function SkyHunt({ onAnswered, alias }: { onAnswered: (cold: bool
       </button>)}</div>
       {picked && tally && <div className="verdict right">
         <strong>{voters === 1 ? 'You are the first to look at this one.' : `${voters} people have looked: most say “${CHOICES.find(c => c.label === top?.[0])?.title.toLowerCase()}”.`}</strong>
+        {status[hit?.key ?? ''] === 'lead' ? ' The community has confirmed a red dot here: it is a lead for astronomers.' : ''}
         {hit?.y_dwarf_like ? ' Its colours match a cold brown dwarf; your answer helps decide whether it is worth a closer look.' : ''}
         {error && <span className="warn"> Not saved: {error}</span>}
         <button className="button primary compact" onClick={next}>Next source <Icon name="arrow" size={14} /></button>

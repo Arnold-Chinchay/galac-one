@@ -1,4 +1,5 @@
 // One Worker: static web, API and tile files from R2.
+import { skyVerdict, spotVerdict } from "./consensus.js";
 // Injection truth (candidates.is_injection, table injections) is never returned by any endpoint.
 
 const CORS = {
@@ -189,11 +190,48 @@ async function skyVoteCounts(env, url) {
   const region = url.searchParams.get("region") || "";
   if (!/^r\d{1,6}$/.test(region)) return err(400, "region must look like r1234");
   const { results } = await env.DB.prepare(
-    "SELECT source_key, label, COUNT(*) AS n FROM sky_votes WHERE region = ?1 GROUP BY source_key, label LIMIT 2000"
+    `SELECT s.source_key, s.label, COUNT(*) AS n, SUM(COALESCE(u.reliability, 0.5)) AS w
+       FROM sky_votes s LEFT JOIN users u ON u.id = s.user_id WHERE s.region = ?1 GROUP BY s.source_key, s.label LIMIT 2000`
   ).bind(region).all();
-  const counts = {};
-  for (const r of results) (counts[r.source_key] ??= { red: 0, star: 0, glare: 0, nothing: 0 })[r.label] = r.n;
-  return json({ region, counts }, 200, { "cache-control": "public, max-age=30" });
+  const counts = {}, weights = {};
+  for (const r of results) {
+    (counts[r.source_key] ??= { red: 0, star: 0, glare: 0, nothing: 0 })[r.label] = r.n;
+    (weights[r.source_key] ??= {})[r.label] = r.w;
+  }
+  const status = {};
+  for (const k of Object.keys(counts)) status[k] = skyVerdict(weights[k], Object.values(counts[k]).reduce((s, x) => s + x, 0)).status;
+  return json({ region, counts, status }, 200, { "cache-control": "public, max-age=30" });
+}
+
+// GET /api/consensus -> what the community has decided so far, answers weighted by each person's reliability.
+// Hidden test objects are never listed: only real candidates and sky-search sources.
+async function consensus(env) {
+  const [spots, sky] = await Promise.all([
+    env.DB.prepare(
+      `SELECT v.candidate_id AS id, c.tile_id, t.label AS field, c.x, c.y, v.label, COUNT(*) AS n, SUM(COALESCE(u.reliability, 0.5)) AS w
+         FROM votes v JOIN candidates c ON c.id = v.candidate_id JOIN tiles t ON t.id = c.tile_id
+         LEFT JOIN users u ON u.id = v.user_id
+        WHERE c.is_injection = 0 GROUP BY v.candidate_id, v.label`).all(),
+    env.DB.prepare(
+      `SELECT s.source_key AS id, MIN(s.ra) AS ra, MIN(s.dec) AS dec, s.label, COUNT(*) AS n, SUM(COALESCE(u.reliability, 0.5)) AS w
+         FROM sky_votes s LEFT JOIN users u ON u.id = s.user_id GROUP BY s.source_key, s.label`).all().catch(() => ({ results: [] })),
+  ]);
+  const group = (rows) => {
+    const by = new Map();
+    for (const r of rows) {
+      const g = by.get(r.id) ?? { ...r, n: 0, w: {} };
+      g.n += r.n; g.w[r.label] = r.w; by.set(r.id, g);
+    }
+    return [...by.values()];
+  };
+  const fields = group(spots.results).map((g) => ({ id: g.id, field: g.field, tile_id: g.tile_id, x: g.x, y: g.y, voters: g.n, ...spotVerdict(g.w, g.n) }));
+  const sources = group(sky.results).map((g) => ({ id: g.id, ra: g.ra, dec: g.dec, voters: g.n, ...skyVerdict(g.w, g.n) }));
+  const count = (xs, s) => xs.filter((x) => x.status === s).length;
+  const byShare = (a, b) => b.share - a.share || b.voters - a.voters;
+  return json({
+    spots: { leads: fields.filter((x) => x.status === "lead").sort(byShare).slice(0, 20), n_lead: count(fields, "lead"), n_rejected: count(fields, "rejected"), n_open: count(fields, "open") },
+    sky: { leads: sources.filter((x) => x.status === "lead").sort(byShare).slice(0, 20), n_lead: count(sources, "lead"), n_rejected: count(sources, "rejected"), n_open: count(sources, "open") },
+  }, 200, { "cache-control": "public, max-age=60" });
 }
 
 async function stats(env) {
@@ -242,6 +280,7 @@ export default {
       if (path === "/api/sky-votes" && request.method === "POST") return postSkyVotes(env, request);
       if (path === "/api/sky-votes") return skyVoteCounts(env, url);
       if (path === "/api/stats") return stats(env);
+      if (path === "/api/consensus") return consensus(env);
       if (path === "/api/me") return me(env, url);
 
       if (path.startsWith("/tiles/")) {
