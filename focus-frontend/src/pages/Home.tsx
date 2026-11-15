@@ -45,7 +45,7 @@ export default function Home({ targets, community, onOpen, onClassify, onTrainin
   const [cold, setCold] = useState<{ ra: number; dec: number }[]>([])
   // Cold-dwarf candidates from the automatic search join the map on their own as the sky is searched.
   const marks = [...targets.map(t => ({ id: t.tile_id, title: t.title, ra: t.center.ra_deg, dec: t.center.dec_deg })),
-    ...cold.map((c, i) => ({ id: `cold:${i}`, title: 'Cold candidate', ra: c.ra, dec: c.dec }))]
+    ...cold.map((c, i) => ({ id: `cold:${i}`, title: i === 0 ? 'Cold candidates' : '', ra: c.ra, dec: c.dec }))]
 
   return <section className="sky-home">
     <SkyMap ra={180} dec={0} fovDeg={360} allSky height="100%" caption={false} marks={marks} inset={392}
