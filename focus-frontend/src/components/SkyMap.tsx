@@ -64,24 +64,12 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
         if (allSky) { try { if (want) al.hideCooGrid(); else al.showCooGrid() } catch { /* no grid API */ } }
       }
       try { hips.setColormap('inferno', { stretch: 'asinh' }) } catch { /* older builds: keep grey */ }
-      // Our stacks are drawn over the public map so it is clear what has been stacked. Their sky background is
-      // removed (black); from afar it is lifted a little so stacked areas read as a dark starfield, not a hole.
-      const deeps: any[] = []
-      let lifted: boolean | null = null
-      const fade = (fov: number) => {
-        const want = fov > 3
-        if (want === lifted) return
-        lifted = want
-        deeps.forEach(d => { try { d.setBrightness(want ? 0.07 : 0) } catch { /* older builds */ } })
-      }
       mosaics?.forEach((url, i) => {
         const deep = A.HiPS(url, { name: 'mosaic-' + i, imgFormat: 'png' })
         // The stacks keep the sky black; lift the faint end so dim sources show up close in.
         try { deep.setGamma?.(0.7) } catch { /* older builds */ }
         al.setOverlayImageLayer(deep, 'mosaic-' + i)
-        deeps.push(deep)
       })
-      fade(fovDeg)
       if (box) {
         const ov = A.graphicOverlay({ color: '#f5a524', lineWidth: 2 })
         al.addOverlay(ov)
@@ -98,7 +86,6 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
         const fov = Array.isArray(f) ? f[0] : typeof f === 'number' ? f : al.getFov()[0]
         if (fov < minFov * 0.98) al.setFoV(minFov)
         tint(fov)
-        fade(fov)
         setZoomed(fov < fovDeg * 0.9)
       })
       // A click flies toward the point and zooms in; a click near a field opens it.
