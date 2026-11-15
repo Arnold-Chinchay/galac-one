@@ -15,6 +15,13 @@ import FollowStar from '../components/FollowStar'
 import SkyHunt from '../components/SkyHunt'
 import FieldPicker from '../components/FieldPicker'
 
+/** One line per mode, shown as a hint in the bar and as a tooltip on each tab. */
+const MODE_HELP = {
+  spots: 'Watch the loop: does the flagged dot move, blink or just glitch?',
+  follow: 'Click a star and follow it through months of photos: does it shift?',
+  hunt: 'The sky search found very red sources: is a red dot really there?',
+} as const
+
 const CHOICES: { label: Label; title: string; hint: string }[] = [
   { label: 'moving', title: 'It moves', hint: 'Changes place over time' },
   { label: 'variable', title: 'It blinks', hint: 'Same place, brighter or fainter' },
@@ -168,11 +175,12 @@ export default function ClassifyPage(p: Props) {
 
     <header className="play-bar">
       <div className="segmented play-modes" role="tablist" aria-label="How to help">
-        <button role="tab" aria-selected={mode === 'spots'} className={mode === 'spots' ? 'active' : ''} onClick={() => setMode('spots')}>Spot check</button>
-        <button role="tab" aria-selected={mode === 'follow'} className={mode === 'follow' ? 'active' : ''} onClick={() => setMode('follow')}>Follow a star</button>
-        <button role="tab" aria-selected={mode === 'hunt'} className={mode === 'hunt' ? 'active' : ''} onClick={() => setMode('hunt')}>Sky hunt</button>
+        <button role="tab" aria-selected={mode === 'spots'} className={mode === 'spots' ? 'active' : ''} data-tip={MODE_HELP.spots} onClick={() => setMode('spots')}>Spot check</button>
+        <button role="tab" aria-selected={mode === 'follow'} className={mode === 'follow' ? 'active' : ''} data-tip={MODE_HELP.follow} onClick={() => setMode('follow')}>Follow a star</button>
+        <button role="tab" aria-selected={mode === 'hunt'} className={mode === 'hunt' ? 'active' : ''} data-tip={MODE_HELP.hunt} onClick={() => setMode('hunt')}>Sky hunt</button>
       </div>
       {mode !== 'hunt' && <FieldPicker fields={fields} current={training ? null : tile.manifest.tile_id} onPractice={() => p.onTraining()} onPick={f => p.onField(f)} />}
+      <p className="mode-hint">{MODE_HELP[mode]}</p>
       <button className="score-pill" onClick={() => setProfile(v => !v)} aria-expanded={profile} title="Your rank, badges and the leaderboard">
         <span className="rank-badge">{rank.level}</span>
         <span className="score-text"><strong>{rank.name}</strong><small>{game.xp} pts{rank.to ? ` · ${rank.to - game.xp} to ${rank.nextName}` : ''}</small><i className="xp-bar"><b style={{ width: `${rank.progress * 100}%` }} /></i></span>

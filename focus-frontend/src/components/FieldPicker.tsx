@@ -58,9 +58,10 @@ export default function FieldPicker({ fields, current, onPractice, onPick }: Pro
         {!q && <ul><li><button role="option" aria-selected={current === null} className={current === null ? 'on' : ''} onClick={() => { setOpen(false); onPractice() }}>
           <span className="fp-name">Practice</span><span className="fp-meta">answers shown</span>{current === null && <Icon name="check" size={15} />}
         </button></li></ul>}
-        {challenge.length > 0 && <><h4>Challenge fields <small>{challenge.length}</small></h4><ul>{challenge.map(row)}</ul></>}
+        {challenge.length > 0 && <><h4>Challenge fields <small>{challenge.length}</small></h4><p className="fp-note">Known objects picked for the challenge: good for learning what real motion looks like.</p><ul>{challenge.map(row)}</ul></>}
         <h4>New from the sky search <small>{nSky}</small>
           {nCold > 0 && <button className={'fp-filter ' + (coldOnly ? 'on' : '')} onClick={() => setColdOnly(v => !v)}>Cold only · {nCold}</button>}</h4>
+        {nSky > 0 && <p className="fp-note">Cut automatically around the most promising red sources. Nobody has checked them yet.</p>}
         {sky.length ? <ul>{sky.map(row)}</ul>
           : <p className="fp-empty">{nSky ? 'Nothing matches.' : 'The automatic sky search adds a field here around each promising red source it finds. Check back soon.'}</p>}
       </div>
