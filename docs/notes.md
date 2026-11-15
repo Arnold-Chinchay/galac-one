@@ -74,3 +74,10 @@ Las estrellas brillantes saturan: hay que usar alas o halo. La astrometría de G
 ## Pendiente
 - Verificar el movimiento propio de WISE 0855 con CatWISE cuando IRSA TAP funcione; corregir su paralaje.
 - Medir completitud con más inyecciones y más campos; interfaz de front.
+
+## 15-nov: búsqueda automática conectada al juego y a la comunidad
+- **Campos jugables nuevos** (`pipeline/sky_field.py`): en cada celda del rastreo se recorta un campo de 40×40 con todas sus fechas alrededor de la fuente roja más prometedora (primero colores de enana fría, luego exceso que sube hacia 4.5 µm). Se publican los 2 mejores por región en Hugging Face `fields/` (índice con máx. 30, fríos primero). La API los lista junto a los 5 del reto y el primer voto los registra en D1. Probado en local con el campo amplio de WISE 0855: eligió a WISE 0855. **[sin probar en GitHub hasta la siguiente corrida]**
+- **Consenso** (`api/src/consensus.js`, `GET /api/consensus`): cada respuesta pesa la confiabilidad de su autor; decide con ≥3 personas, peso ≥1.2 y 60 % de mayoría. Sky hunt saca lo descartado y pone primero lo confirmado. La página del cielo muestra "Community leads". Los objetos de prueba nunca se listan.
+- **Uniones del mosaico** (`pipeline/mosaic.py`): núcleos saturados en blanco (antes salían rojos o negros porque en las bandas cortas el centro queda hundido), fundido de 0.2° entre regiones vecinas y transparencia según la huella (los núcleos ya no abren huecos). Solo aplica a regiones nuevas; las publicadas antes conservan sus cortes.
+- **Carga más rápida:** lista de campos precargada, manifiesto + cubos + puntos en paralelo, archivos de campo en la caché de Cloudflare (1 día) y archivos con hash en caché permanente (`public/_headers`). Comprimir los cubos solo ahorra 13-20 % (son casi todo ruido): no vale la pena.
+- **Classify:** Sky hunt con anillo "look here" sobre la imagen profunda, respuestas sí/no con dibujo y "I can't tell"; selector de campos con búsqueda, grupos y filtro de fríos; una línea de ayuda por modo.

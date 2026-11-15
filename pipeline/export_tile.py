@@ -1,4 +1,4 @@
-"""Write a tile in the data format the web reads (see docs/13)."""
+"""Write a tile in the data format the web reads (see docs/api.md)."""
 from __future__ import annotations
 
 import json

@@ -1,4 +1,4 @@
-// Adapter from the live Naylamp API and tile format (docs/frontend.md) to the viewer's types.
+// Adapter from the live Naylamp API and tile format (docs/api.md) to the viewer's types.
 import type { Candidate, Field, Frame, Label, Manifest, Position, Tile, Vote, VoteResult } from './types'
 import { flattenResiduals, scienceStretch } from '../lib/render.ts'
 import type { Cube } from '../lib/render.ts'

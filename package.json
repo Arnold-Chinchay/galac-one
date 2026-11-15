@@ -1,26 +1,16 @@
 {
-  "name": "hackaton-nasa-2026",
+  "name": "galac-one",
   "version": "1.0.0",
-  "description": "A public web tool that finds moving and variable objects in SPHEREx sky images using spectral subtraction, and turns volunteers into a calibrated detector.",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
+  "private": true,
+  "description": "GALAC ONE by Naylamp Space: citizen science on NASA SPHEREx data, an automatic search of the infrared sky for objects that move or change and a game to decide which ones are real. NASA Space Apps 2026.",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npm --prefix focus-frontend run build",
+    "test": "npm --prefix focus-frontend test && node --test api/tests/consensus.test.js",
+    "deploy": "npm run build && wrangler deploy"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/spacenaylamp-blip/galac-one.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/spacenaylamp-blip/galac-one/issues"
-  },
-  "homepage": "https://github.com/spacenaylamp-blip/galac-one#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/spacenaylamp-blip/galac-one.git" },
+  "homepage": "https://naylamspace.earth",
+  "license": "MIT",
   "devDependencies": {
     "wrangler": "^4.162.0"
   }
