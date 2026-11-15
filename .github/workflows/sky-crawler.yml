@@ -77,6 +77,7 @@ jobs:
           wait
           df -h / | tail -1
       - name: Read the region's frames once
+        continue-on-error: true            # cells read any frame missing from the store straight from S3
         run: |
           python -m pipeline.region_store --ra ${{ matrix.r.ra }} --dec ${{ matrix.r.dec }} --size 2.6 --step 0.34 --cell-fov 0.45 --index cache/merged/*.csv.gz --out store --workers 32
           df -h / | tail -1
