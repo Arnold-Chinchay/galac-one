@@ -41,7 +41,7 @@ export default function SkyMap({ ra, dec, fovDeg, allSky, height = 300, marks, b
     loadAladin().then(A => {
       if (!alive || !el.current) return
       al = A.aladin(el.current, {
-        survey: SPHEREX_HIPS, fov: fovDeg, target: `${ra} ${dec}`, cooFrame: 'ICRS', projection: allSky ? 'AIT' : 'SIN',
+        survey: SPHEREX_HIPS, fov: fovDeg, target: `${ra} ${dec}`, cooFrame: 'ICRS', log: false, projection: allSky ? 'AIT' : 'SIN',
         showReticle: false, showLayersControl: false, showProjectionControl: false, showFrame: false,
         showCooGridControl: false, showSimbadPointerControl: false, showFullscreenControl: false,
         showZoomControl: true, showContextMenu: false, showStatusBar: false, showCooLocation: false, showCooGrid: !!allSky,

@@ -1,44 +1,49 @@
-// One candidate at a time: a close-up loop of the spot the detector flagged, a few visual aids, and one plain question.
-import { useEffect, useMemo, useState } from 'react'
+// Classify as a game that fits one screen: the flagged spot loops large on the left, one question with four big
+// answers on the right, clues only when asked for, and points, streaks, ranks and badges for taking part.
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Candidate, CommunityStats, Field, Label, Tile, UserStats } from '../data/types'
 import type { StoredVote } from '../lib/storage'
 import { safeRead, safeWrite } from '../lib/storage'
 import { timeColour } from '../lib/render'
+import { BADGES, answer as scoreAnswer, loadGame, rankOf, saveGame, skip as breakStreak } from '../lib/game'
+import type { Game } from '../lib/game'
 import { Icon } from '../components/Icons'
 import FrameCanvas from '../components/FrameCanvas'
 import Pictogram from '../components/Pictogram'
 import FollowStar from '../components/FollowStar'
 
 const CHOICES: { label: Label; title: string; hint: string }[] = [
-  { label: 'moving', title: 'It moves', hint: 'The dot is in a different place over time' },
-  { label: 'variable', title: 'It blinks in place', hint: 'Same place, but brighter or fainter' },
-  { label: 'artifact', title: 'It’s a glitch', hint: 'Shows up once, or has an odd shape' },
-  { label: 'unsure', title: 'Not sure', hint: 'A useful answer too' },
+  { label: 'moving', title: 'It moves', hint: 'Changes place over time' },
+  { label: 'variable', title: 'It blinks', hint: 'Same place, brighter or fainter' },
+  { label: 'artifact', title: 'A glitch', hint: 'Appears once, or looks odd' },
+  { label: 'unsure', title: 'Not sure', hint: 'Still a useful answer' },
 ]
 const ANSWER: Record<Label, string> = {
-  moving: 'it moves: the dot changes place along a line.',
-  variable: 'it blinks in place: same spot, changing brightness.',
-  artifact: 'it’s a glitch: it appears in one photograph and is gone in the next.',
-  unsure: 'unclear.',
+  moving: 'it moves along a line.', variable: 'it blinks in place.', artifact: 'it’s a glitch: one photograph only.', unsure: 'unclear.',
 }
 const INTRO_KEY = 'galac.classify-intro.v1'
 
-function Intro({ onPractice, onStart }: { onPractice: () => void; onStart: () => void }) {
+function HowItWorks({ onPractice, onStart, onClose }: { onPractice: () => void; onStart: () => void; onClose: () => void }) {
   const steps: [string, string, ReactNode][] = [
-    ['Watch', 'Each loop shows the same small patch of sky, photographed by SPHEREx over days or months. A computer flagged a glowing dot in it.', <Pictogram label="moving" />],
-    ['Decide', 'Does the dot move, blink in place, or show up only once? You do not need to know any astronomy.', <Pictogram label="variable" />],
-    ['Count', 'Many people answer each spot. Some spots are hidden tests with a known answer, so the project can measure how reliable every answer is.', <Pictogram label="artifact" />],
+    ['Watch', 'A patch of sky photographed by SPHEREx over days or months loops on the left. A computer flagged the glowing dot in the ring.', <Pictogram label="moving" />],
+    ['Answer', 'Does it move, blink, or show up once? Keys 1 to 4 work too. No astronomy needed.', <Pictogram label="variable" />],
+    ['Score', 'Every answer earns points; answers in a row earn more. Some spots are hidden tests, so your accuracy stars show how sharp your eye is.', <Pictogram label="artifact" />],
   ]
-  return <div className="modal-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="intro-title" className="classify-intro">
-    <span className="eyebrow">HOW IT WORKS · 30 SECONDS</span>
+  return <div className="modal-backdrop" onClick={onClose}><section role="dialog" aria-modal="true" aria-labelledby="intro-title" className="classify-intro" onClick={e => e.stopPropagation()}>
+    <span className="eyebrow">HOW TO PLAY · 30 SECONDS</span>
     <h2 id="intro-title">Help a computer tell real objects from noise.</h2>
     <ol>{steps.map(([title, text, pic], i) => <li key={title}><span className="step-n">{i + 1}</span>{pic}<div><strong>{title}</strong><p>{text}</p></div></li>)}</ol>
     <div className="intro-actions">
-      <button className="button primary" onClick={onPractice}>Practice with answers first <Icon name="arrow" size={16} /></button>
-      <button className="text-button" onClick={onStart}>Start with real data</button>
+      <button className="button primary" onClick={onPractice}>Warm up with 4 practice spots <Icon name="arrow" size={16} /></button>
+      <button className="text-button" onClick={onStart}>Play with real data</button>
     </div>
   </section></div>
+}
+
+function Stars({ value }: { value: number | null }) {
+  const n = value === null ? 0 : Math.round(value * 5)
+  return <span className="stars" aria-label={value === null ? 'Accuracy not measured yet' : `Accuracy ${n} of 5`}>{[0, 1, 2, 3, 4].map(i => <i key={i} className={i < n ? 'on' : ''}>★</i>)}</span>
 }
 
 interface Props {
@@ -54,10 +59,14 @@ export default function ClassifyPage(p: Props) {
   const [intro, setIntro] = useState(() => !safeRead<boolean>(INTRO_KEY, false))
   const [view, setView] = useState<'residual' | 'science'>('residual')
   const [mode, setMode] = useState<'spots' | 'follow'>('spots')
-  const [k, setK] = useState(0), [playing, setPlaying] = useState(true), [delay, setDelay] = useState(450)
+  const [clues, setClues] = useState(false), [profile, setProfile] = useState(false)
+  const [k, setK] = useState(0), [playing, setPlaying] = useState(true), [delay, setDelay] = useState(420)
+  const [game, setGame] = useState<Game>(loadGame)
+  const [pop, setPop] = useState<{ id: number; text: string } | null>(null), [badge, setBadge] = useState<string | null>(null)
+  const popId = useRef(0)
   const closeIntro = () => { safeWrite(INTRO_KEY, true); setIntro(false) }
+  const update = (g: Game) => { setGame(g); saveGame(g) }
 
-  // Frames to loop: those where the detector saw the dot; a lone detection gets its neighbours so it can be seen to vanish.
   const seq = useMemo(() => {
     if (!candidate) return []
     const at = new Map(tile.frames.map((f, i) => [f.frame_id, i]))
@@ -76,7 +85,6 @@ export default function ClassifyPage(p: Props) {
   }, [candidate, hits])
 
   useEffect(() => { setK(0); setPlaying(true) }, [candidate?.candidate_id])
-  useEffect(() => { const n = tile.candidates.length; if (n > 0 && p.votes.length >= n && !training) setPlaying(false) }, [p.votes.length, tile, training])
   useEffect(() => {
     if (!playing || seq.length < 2) return
     const id = setInterval(() => setK(n => (n + 1) % seq.length), delay)
@@ -84,22 +92,26 @@ export default function ClassifyPage(p: Props) {
   }, [playing, seq.length, delay])
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.closest('input,textarea,select') || intro) return
+      if ((e.target as HTMLElement)?.closest('input,textarea,select') || intro || mode === 'follow') return
       if (e.code === 'Space') { e.preventDefault(); setPlaying(v => !v) }
       if (e.key === 'ArrowRight') { e.preventDefault(); setPlaying(false); setK(n => (n + 1) % Math.max(1, seq.length)) }
       if (e.key === 'ArrowLeft') { e.preventDefault(); setPlaying(false); setK(n => (n - 1 + seq.length) % Math.max(1, seq.length)) }
+      if (e.key.toLowerCase() === 'c') setClues(v => !v)
     }
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
-  }, [seq.length, intro])
+  }, [seq.length, intro, mode])
+  useEffect(() => { if (!pop) return; const t = setTimeout(() => setPop(null), 1100); return () => clearTimeout(t) }, [pop])
+  useEffect(() => { if (!badge) return; const t = setTimeout(() => setBadge(null), 3200); return () => clearTimeout(t) }, [badge])
 
   const done = new Set(p.votes.map(v => v.candidate_id))
   const fields = p.targets.filter(t => t.status === 'ready')
   const total = tile.candidates.length, finished = tile.candidates.filter(c => done.has(c.candidate_id)).length
+  const complete = total > 0 && finished >= total
   const fi = seq[Math.min(k, seq.length - 1)], frame = fi !== undefined ? tile.frames[fi] : undefined
   const here = frame ? pos.get(frame.frame_id) : undefined
   const side = crop ? crop.half * 2 + 1 : 1, ox = crop ? Math.round(crop.cx) - crop.half : 0, oy = crop ? Math.round(crop.cy) - crop.half : 0
-  const toBox = (x: number, y: number) => [x - ox + .5, y - oy + .5]
+  const toBox = (x: number, y: number) => [x - ox + .5, y - oy + .5] as [number, number]
   const first = hits[0], last = hits[hits.length - 1]
   const frameOf = (id?: string) => tile.frames.findIndex(f => f.frame_id === id)
   const days = first && last ? (Date.parse(tile.frames[frameOf(last.frame_id)].observed_at_utc) - Date.parse(tile.frames[frameOf(first.frame_id)].observed_at_utc)) / 86400000 : 0
@@ -107,123 +119,129 @@ export default function ClassifyPage(p: Props) {
   const t0 = first ? Date.parse(tile.frames[frameOf(first.frame_id)].observed_at_utc) : 0
   const span = Math.max(1, days * 86400000)
   const answered = p.selectedVote, right = training && answered && candidate?.suggested_label === answered.label
-  // A field is complete once every spot has this person's answer: stop the loop and show what they did instead.
-  const complete = total > 0 && finished >= total
+  const rank = rankOf(game.xp)
   const tally = CHOICES.map(c => ({ ...c, n: p.votes.filter(v => v.label === c.label).length }))
   const others = fields.filter(t => t.tile_id !== tile.manifest.tile_id)
 
-  // Ring size follows the crop so it reads the same on a small or a wide close-up.
+  function choose(label: Label) {
+    if (!candidate) return
+    const first = !answered
+    p.onVote(label)
+    if (!first) return
+    const isRight = training && candidate.suggested_label === label
+    const r = scoreAnswer(game, tile.manifest.tile_id, { practice: training, right: isRight, cleared: !training && finished + 1 >= total })
+    update(r.game)
+    setPop({ id: ++popId.current, text: `+${r.gained}${r.game.streak > 1 ? `  ×${r.game.streak}` : ''}` })
+    if (r.unlocked.length) setBadge(r.unlocked[r.unlocked.length - 1])
+  }
+  function next() { if (!answered) update(breakStreak(game)); p.onNext() }
+  // Answer keys live in App for real spots; practice keeps its answer on screen until Next.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.closest('input,textarea,select') || intro || mode === 'follow') return
+      const i = ['1', '2', '3', '4'].indexOf(e.key)
+      if (i >= 0) { e.preventDefault(); e.stopImmediatePropagation(); choose(CHOICES[i].label) }
+      if (e.key === 'Enter') { e.preventDefault(); e.stopImmediatePropagation(); next() }
+    }
+    window.addEventListener('keydown', key, true)
+    return () => window.removeEventListener('keydown', key, true)
+  })
+
   const ring = (x: number, y: number, dashed = false) => <circle cx={x} cy={y} r={Math.max(1.3, side * .07)} fill="none" stroke="#78ecdb"
     strokeWidth={side * .008} strokeDasharray={dashed ? `${side * .025} ${side * .02}` : undefined} />
   const still = (label: string, id?: string) => {
     const i = frameOf(id), q = id ? pos.get(id) : undefined
-    return <figure className="evidence">
-      <div className="evidence-img">{crop && i >= 0 && <FrameCanvas tile={tile} k={tile.frames[i].cube_index ?? i} options={{ view: 'residual', crop }} label={label} />}
-        {q && <svg viewBox={`0 0 ${side} ${side}`}>{ring(...toBox(q.x_px, q.y_px) as [number, number])}</svg>}</div>
-      <figcaption><strong>{label}</strong>{i >= 0 ? tile.frames[i].observed_at_utc.slice(0, 10) : '—'}</figcaption>
-    </figure>
+    return <figure className="clue"><div className="clue-img">{crop && i >= 0 && <FrameCanvas tile={tile} k={tile.frames[i].cube_index ?? i} options={{ view: 'residual', crop }} label={label} />}
+      {q && <svg viewBox={`0 0 ${side} ${side}`}>{ring(...toBox(q.x_px, q.y_px))}</svg>}</div><figcaption>{label}</figcaption></figure>
   }
 
-  return <div className="classify2">
-    {intro && <Intro onPractice={() => { closeIntro(); if (!training) p.onTraining() }} onStart={() => { closeIntro(); if (training) p.onRealData() }} />}
-    <div className="mode-switch" role="tablist" aria-label="How to help">
-      <button role="tab" aria-selected={mode === 'spots'} className={mode === 'spots' ? 'active' : ''} onClick={() => setMode('spots')}><strong>Check the computer’s spots</strong><small>Quick yes/no style answers on dots it flagged</small></button>
-      <button role="tab" aria-selected={mode === 'follow'} className={mode === 'follow' ? 'active' : ''} onClick={() => setMode('follow')}><strong>Follow your own star</strong><small>Pick any dot or area; we measure it and you report</small></button>
-    </div>
-    <nav className="field-chips" aria-label="Fields to classify">
-      <button className={training ? 'active practice' : 'practice'} onClick={p.onTraining}><Icon name="play" size={12} />Practice</button>
-      {fields.map(t => <button key={t.tile_id} className={!training && tile.manifest.tile_id === t.tile_id ? 'active' : ''} onClick={() => p.onField(t)}>{t.title}</button>)}
-      <button className="text-button how" onClick={() => setIntro(true)}><Icon name="help" size={14} />How it works</button>
-    </nav>
+  return <div className="play">
+    {intro && <HowItWorks onClose={closeIntro} onPractice={() => { closeIntro(); if (!training) p.onTraining() }} onStart={() => { closeIntro(); if (training) p.onRealData() }} />}
+    {badge && <div className="badge-pop" role="status"><span className="badge-medal"><Icon name="star" size={22} /></span><div><small>BADGE UNLOCKED</small><strong>{BADGES[badge]?.name}</strong><span>{BADGES[badge]?.how}</span></div></div>}
 
-    {mode === 'follow' ? <FollowStar tile={tile} /> : <div className="classify2-grid">
-      <section className="stage" aria-label="Close-up of the flagged spot">
-        <div className="stage-head">
-          <div><span className="eyebrow">{training ? 'PRACTICE · SYNTHETIC SKY WITH ANSWERS' : `${tile.manifest.title.toUpperCase()} · REAL SPHEREx DATA`}</span>
-            <strong>{complete && !training ? `All ${total} spots done` : `Spot ${p.candidateNumber} of ${total}`}</strong></div>
-          <div className="segmented small">
-            <button className={view === 'residual' ? 'active' : ''} onClick={() => setView('residual')} title="Each photograph minus what this patch of sky normally looks like">Changes only</button>
-            <button className={view === 'science' ? 'active' : ''} onClick={() => setView('science')} title="The photographs as SPHEREx took them">Raw photos</button>
-          </div>
-        </div>
-        <div className="progress" aria-label={`${finished} of ${total} spots done in this field`}><i style={{ width: `${total ? finished / total * 100 : 0}%` }} /></div>
+    <header className="play-bar">
+      <div className="segmented play-modes" role="tablist" aria-label="How to help">
+        <button role="tab" aria-selected={mode === 'spots'} className={mode === 'spots' ? 'active' : ''} onClick={() => setMode('spots')}>Spot check</button>
+        <button role="tab" aria-selected={mode === 'follow'} className={mode === 'follow' ? 'active' : ''} onClick={() => setMode('follow')}>Follow a star</button>
+      </div>
+      <label className="field-select"><span>Field</span>
+        <select value={training ? '__practice' : tile.manifest.tile_id} onChange={e => { if (e.target.value === '__practice') p.onTraining(); else { const t = fields.find(x => x.tile_id === e.target.value); if (t) p.onField(t) } }}>
+          <option value="__practice">Practice (answers shown)</option>
+          {fields.map(t => <option key={t.tile_id} value={t.tile_id}>{t.title}</option>)}
+        </select></label>
+      <button className="score-pill" onClick={() => setProfile(v => !v)} aria-expanded={profile} title="Your rank, badges and the leaderboard">
+        <span className="rank-badge">{rank.level}</span>
+        <span className="score-text"><strong>{rank.name}</strong><small>{game.xp} pts{rank.to ? ` · ${rank.to - game.xp} to ${rank.nextName}` : ''}</small><i className="xp-bar"><b style={{ width: `${rank.progress * 100}%` }} /></i></span>
+        {game.streak > 1 && <span className="streak" title="Answers in a row">×{game.streak}</span>}
+      </button>
+      <button className="icon-button" aria-label="How to play" onClick={() => setIntro(true)}><Icon name="help" size={18} /></button>
+      {profile && <div className="profile-pop">
+        <div className="profile-head"><strong>{rank.name}</strong><span>{game.answers} answers · best streak {game.best}</span></div>
+        {!training && p.stats && p.stats.n_votes > 0 && <div className="accuracy"><Stars value={p.stats.reliability} /><span>accuracy on hidden tests</span></div>}
+        <label className="alias">Name on the leaderboard<input maxLength={24} value={game.alias} placeholder="anonymous" onChange={e => update({ ...game, alias: e.target.value.replace(/[^\w .-]/g, '') })} /></label>
+        <div className="badge-grid">{Object.entries(BADGES).map(([id, b]) => <span key={id} className={game.badges.includes(id) ? 'got' : ''} title={b.how}><Icon name="star" size={14} />{b.name}</span>)}</div>
+        {p.community?.leaderboard?.length ? <ol className="board">{p.community.leaderboard.slice(0, 5).map((u, i) => <li key={i}><span>{u.alias}</span><b>{u.n_votes}</b></li>)}</ol> : null}
+      </div>}
+    </header>
+
+    {mode === 'follow' ? <div className="play-follow"><FollowStar tile={tile} /></div> : <div className="play-main">
+      <section className="arena" aria-label="Close-up of the flagged spot">
         {complete && !training ? <div className="field-done">
           <span className="done-mark"><Icon name="check" size={28} /></span>
-          <h3>All {total} spots in {tile.manifest.title} have your answer.</h3>
-          <p>Thank you. Your answers are combined with everyone else’s; the hidden tests among them measure how reliable each answer is.</p>
+          <h3>{tile.manifest.title} cleared: all {total} spots answered.</h3>
           <div className="tally">{tally.map(c => <div key={c.label}><Pictogram label={c.label} /><strong>{c.n}</strong><span>{c.title}</span></div>)}</div>
-          {others.length > 0 && <><p className="next-label">Keep going in another field:</p>
-            <div className="next-fields">{others.map(t => <button key={t.tile_id} className="button secondary compact" onClick={() => p.onField(t)}>{t.title} <Icon name="arrow" size={13} /></button>)}</div></>}
-        </div> : !candidate || !crop ? <div className="stage-empty">The detector found nothing to review in this field. Pick another one above.</div> : <>
-          <div className="loop">
-            {frame && <FrameCanvas tile={tile} k={frame.cube_index ?? fi} options={{ view, crop }} label={`Close-up, photograph ${k + 1} of ${seq.length}`} />}
-            <svg viewBox={`0 0 ${side} ${side}`} aria-hidden="true">
-              {here && ring(...toBox(here.x_px, here.y_px) as [number, number], !here.detected)}
-            </svg>
-            <span className="loop-scale">{(side * (tile.manifest.pixel_scale_arcsec || 6.15) / 60).toFixed(1)}′ across · north up</span>
+          {others.length > 0 && <div className="next-fields">{others.map(t => <button key={t.tile_id} className="button secondary compact" onClick={() => p.onField(t)}>{t.title} <Icon name="arrow" size={13} /></button>)}</div>}
+        </div> : !candidate || !crop ? <div className="stage-empty">Nothing to check in this field. Pick another one above.</div> :
+        <div className="loop-card" key={candidate.candidate_id}>
+          {frame && <FrameCanvas tile={tile} k={frame.cube_index ?? fi} options={{ view, crop }} label={`Close-up, photograph ${k + 1} of ${seq.length}`} />}
+          <svg viewBox={`0 0 ${side} ${side}`} aria-hidden="true">{here && ring(...toBox(here.x_px, here.y_px), !here.detected)}</svg>
+          <div className="arena-top">
+            <span className="chip">{training ? 'Practice' : tile.manifest.title} · spot {p.candidateNumber}/{total}</span>
+            <div className="segmented small">
+              <button className={view === 'residual' ? 'active' : ''} onClick={() => setView('residual')} title="Only what differs from the usual sky glows">Changes</button>
+              <button className={view === 'science' ? 'active' : ''} onClick={() => setView('science')} title="The photographs as taken">Photos</button>
+            </div>
           </div>
-          <div className="loop-bar">
-            <button className="play-button" aria-label={playing ? 'Pause' : 'Play'} onClick={() => setPlaying(!playing)}><Icon name={playing ? 'pause' : 'play'} size={16} /></button>
+          <div className="arena-bottom">
+            <button className="play-button" aria-label={playing ? 'Pause' : 'Play'} onClick={() => setPlaying(!playing)}><Icon name={playing ? 'pause' : 'play'} size={15} /></button>
             <input type="range" min={0} max={Math.max(0, seq.length - 1)} value={Math.min(k, seq.length - 1)} aria-label="Photograph" onChange={e => { setPlaying(false); setK(+e.target.value) }} />
-            <span className="mono">{k + 1}/{seq.length} · {frame?.observed_at_utc.slice(0, 10)}</span>
-            <select aria-label="Speed" value={delay} onChange={e => setDelay(+e.target.value)}><option value={800}>Slow</option><option value={450}>Normal</option><option value={200}>Fast</option></select>
+            <span className="mono">{frame?.observed_at_utc.slice(0, 10)}</span>
+            <button className="speed" onClick={() => setDelay(d => d === 420 ? 180 : d === 180 ? 800 : 420)} title="Speed">{delay === 180 ? 'Fast' : delay === 800 ? 'Slow' : 'Normal'}</button>
+            <button className={'clue-toggle ' + (clues ? 'on' : '')} onClick={() => setClues(v => !v)}><Icon name="info" size={14} />Clues</button>
           </div>
-          <p className="loop-caption">{view === 'residual'
-            ? <>Dark is the normal sky. <b className="warm">Bright</b> is something that was not there before. The ring follows where the computer saw the dot{seq.length > hits.length ? '; it is dashed on photographs where it saw nothing' : ''}.</>
-            : <>The photographs as taken. Stars flicker because each photograph is in a different infrared colour; switch to “Changes only” to remove that.</>}</p>
-
-          <div className="evidence-row">
+          <i className="spot-progress" style={{ width: `${total ? finished / total * 100 : 0}%` }} />
+          {clues && <div className="clues">
             {still('First seen', first?.frame_id)}
             {still('Last seen', last?.frame_id)}
-            <figure className="evidence">
-              <div className="evidence-img trail">
-                <FrameCanvas tile={tile} k={0} options={{ view: 'colour', crop }} label="All photographs combined" />
-                <svg viewBox={`0 0 ${side} ${side}`}>
-                  {first && last && hits.length > 1 && <line x1={toBox(first.x_px, first.y_px)[0]} y1={toBox(first.x_px, first.y_px)[1]} x2={toBox(last.x_px, last.y_px)[0]} y2={toBox(last.x_px, last.y_px)[1]} stroke="#ffffff55" strokeWidth={.15} />}
-                  {hits.map((q, i) => { const [x, y] = toBox(q.x_px, q.y_px); const f = tile.frames[frameOf(q.frame_id)]; return <circle key={i} cx={x} cy={y} r={.55} fill={timeColour((Date.parse(f.observed_at_utc) - t0) / span)} stroke="#000" strokeWidth={.08} /> })}
-                </svg>
-              </div>
-              <figcaption><strong>Trail</strong>each dot is a sighting, <span className="trail-key"><i />early to late</span></figcaption>
-            </figure>
-          </div>
-          <p className="facts">Seen in <b>{hits.length}</b> photographs{days >= 1 ? <> over <b>{days.toFixed(0)} days</b></> : ''}. From first to last sighting it shifted <b>{shiftArcsec.toFixed(0)}″</b>{shiftArcsec > 15 ? ', more than two pixels' : ', less than a pixel or two (noise can do that)'}. Dots lined up from blue to red mean motion; a jumble in one place means it stayed put.</p>
-        </>}
+            <figure className="clue"><div className="clue-img"><FrameCanvas tile={tile} k={0} options={{ view: 'colour', crop }} label="All photographs combined" />
+              <svg viewBox={`0 0 ${side} ${side}`}>
+                {first && last && hits.length > 1 && <line x1={toBox(first.x_px, first.y_px)[0]} y1={toBox(first.x_px, first.y_px)[1]} x2={toBox(last.x_px, last.y_px)[0]} y2={toBox(last.x_px, last.y_px)[1]} stroke="#ffffff66" strokeWidth={.15} />}
+                {hits.map((q, i) => { const [x, y] = toBox(q.x_px, q.y_px); return <circle key={i} cx={x} cy={y} r={.55} fill={timeColour((Date.parse(tile.frames[frameOf(q.frame_id)].observed_at_utc) - t0) / span)} stroke="#000" strokeWidth={.08} /> })}
+              </svg></div><figcaption>Trail, blue to red</figcaption></figure>
+            <p>{hits.length} sightings{days >= 1 ? ` over ${days.toFixed(0)} days` : ''} · moved {shiftArcsec.toFixed(0)}″{shiftArcsec > 15 ? '' : ' (within the noise)'}</p>
+          </div>}
+          {pop && <span className="points-pop" key={pop.id}>{pop.text}</span>}
+        </div>}
       </section>
 
-      <aside className="ask">
-        {complete && !training ? <div className="ready"><strong>Field complete.</strong> Pick another field above or below, or practise again.</div> : <>
-        <h2>What is the glowing dot doing?</h2>
-        <div className="choices">{CHOICES.map((c, i) => <button key={c.label} disabled={!candidate} onClick={() => p.onVote(c.label)}
-          className={'choice ' + (answered?.label === c.label ? 'chosen ' : '') + (training && answered && candidate?.suggested_label === c.label ? 'correct' : '')}>
-          <Pictogram label={c.label} /><span><strong>{c.title}</strong><small>{c.hint}</small></span><kbd>{i + 1}</kbd>
-        </button>)}</div>
+      <aside className="answer-panel">
+        {complete && !training ? <div className="ready"><strong>Field cleared.</strong> Pick another field, or follow a star of your own.</div> : <>
+          <h2>What is the glowing dot doing?</h2>
+          <div className="answers">{CHOICES.map((c, i) => <button key={c.label} disabled={!candidate} onClick={() => choose(c.label)}
+            className={'answer ' + (answered?.label === c.label ? 'chosen ' : '') + (training && answered && candidate?.suggested_label === c.label ? 'correct' : '')}>
+            <Pictogram label={c.label} /><span><strong>{c.title}</strong><small>{c.hint}</small></span><kbd>{i + 1}</kbd>
+          </button>)}</div>
+          {training && answered && candidate?.suggested_label ? <div className={'verdict ' + (right ? 'right' : 'wrong')}>
+            <strong>{right ? 'Correct!' : 'Not quite:'}</strong> {right ? 'This one ' + ANSWER[candidate.suggested_label] : 'this one ' + ANSWER[candidate.suggested_label]}
+            {complete ? <button className="button primary compact" onClick={p.onRealData}>Play with real data <Icon name="arrow" size={14} /></button>
+              : <button className="button primary compact" onClick={next}>Next <Icon name="arrow" size={14} /></button>}
+          </div> : <div className="answer-foot">
+            <button className="button secondary compact" disabled={!candidate} onClick={next}>{answered ? 'Next' : 'Skip'} <Icon name="arrow" size={14} /></button>
+            <span>{training ? `${finished}/${total} practice spots` : `${finished}/${total} in this field`}</span>
+            {!training && answered?.status === 'pending' && answered.error && <button className="text-button small" disabled={p.syncing} onClick={p.onRetry}>Retry saving</button>}
+          </div>}
         </>}
-
-        {training && answered && candidate?.suggested_label && <div className={'verdict ' + (right ? 'right' : 'wrong')}>
-          <strong>{right ? 'Correct!' : 'Not quite.'}</strong> This one {ANSWER[candidate.suggested_label]}
-          {complete ? <button className="button primary compact" onClick={p.onRealData}>Classify real data <Icon name="arrow" size={14} /></button>
-            : <button className="button primary compact" onClick={p.onNext}>Next example <Icon name="arrow" size={14} /></button>}
-        </div>}
-        {training && finished >= total && total > 0 && <div className="ready"><strong>You’re ready.</strong> Real SPHEREx spots are messier than these, and that is exactly why people help.
-          <button className="button primary" onClick={p.onRealData}>Classify real data <Icon name="arrow" size={16} /></button></div>}
-        {!training && answered && !complete && <div className={'vote-status ' + (answered.status === 'pending' ? 'warning' : '')}>
-          <Icon name={answered.status === 'pending' ? 'info' : 'check'} size={16} />{answered.status === 'submitted' ? 'Answer saved. Thank you!' : 'Saving…'}
-          {answered.status === 'pending' && answered.error && <button className="text-button small" disabled={p.syncing} onClick={p.onRetry}>Retry</button>}
-        </div>}
-
-        <div className="ask-actions">
-          {!complete && <button className="button secondary" disabled={!candidate} onClick={p.onNext}>{answered ? 'Next spot' : 'Skip'} <Icon name="arrow" size={14} /></button>}
-          {!training && <button className="text-button" onClick={p.onExplore}>Open the whole field</button>}
-        </div>
-
-        <div className="ask-stats">
-          {!training && p.stats && p.stats.n_votes > 0 ? <div><strong>{p.stats.reliability === null ? '—' : Math.round(p.stats.reliability * 100) + '%'}</strong><span>your reliability, from hidden tests</span></div>
-            : <div><strong>{finished}</strong><span>{training ? 'examples done' : 'answers in this field'}</span></div>}
-          <div><strong>{p.community?.votes ?? '—'}</strong><span>answers from everyone</span></div>
-        </div>
-        <p className="fine-print">{training
-          ? 'Practice examples come from a synthetic sky processed by the same pipeline. Nothing here is sent anywhere.'
-          : 'We never say whether one answer was right: some spots are hidden tests. Answers are anonymous. Keys: 1–4 answer, Space play/pause, ← → step, Enter next.'}</p>
+        <p className="play-hint">{training ? 'Practice spots come from a synthetic sky; nothing is sent.' : 'Some spots are hidden tests: we never say which, so your accuracy stars stay honest.'}</p>
       </aside>
     </div>}
   </div>
