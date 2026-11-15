@@ -84,6 +84,7 @@ export default function ClassifyPage(p: Props) {
   }, [candidate, hits])
 
   useEffect(() => { setK(0); setPlaying(true) }, [candidate?.candidate_id])
+  useEffect(() => { const n = tile.candidates.length; if (n > 0 && p.votes.length >= n && !training) setPlaying(false) }, [p.votes.length, tile, training])
   useEffect(() => {
     if (!playing || seq.length < 2) return
     const id = setInterval(() => setK(n => (n + 1) % seq.length), delay)
@@ -114,6 +115,10 @@ export default function ClassifyPage(p: Props) {
   const t0 = first ? Date.parse(tile.frames[frameOf(first.frame_id)].observed_at_utc) : 0
   const span = Math.max(1, days * 86400000)
   const answered = p.selectedVote, right = training && answered && candidate?.suggested_label === answered.label
+  // A field is complete once every spot has this person's answer: stop the loop and show what they did instead.
+  const complete = total > 0 && finished >= total
+  const tally = CHOICES.map(c => ({ ...c, n: p.votes.filter(v => v.label === c.label).length }))
+  const others = fields.filter(t => t.tile_id !== tile.manifest.tile_id)
 
   // Ring size follows the crop so it reads the same on a small or a wide close-up.
   const ring = (x: number, y: number, dashed = false) => <circle cx={x} cy={y} r={Math.max(1.3, side * .07)} fill="none" stroke="#78ecdb"
@@ -139,14 +144,21 @@ export default function ClassifyPage(p: Props) {
       <section className="stage" aria-label="Close-up of the flagged spot">
         <div className="stage-head">
           <div><span className="eyebrow">{training ? 'PRACTICE · SYNTHETIC SKY WITH ANSWERS' : `${tile.manifest.title.toUpperCase()} · REAL SPHEREx DATA`}</span>
-            <strong>Spot {p.candidateNumber} of {total}</strong></div>
+            <strong>{complete && !training ? `All ${total} spots done` : `Spot ${p.candidateNumber} of ${total}`}</strong></div>
           <div className="segmented small">
             <button className={view === 'residual' ? 'active' : ''} onClick={() => setView('residual')} title="Each photograph minus what this patch of sky normally looks like">Changes only</button>
             <button className={view === 'science' ? 'active' : ''} onClick={() => setView('science')} title="The photographs as SPHEREx took them">Raw photos</button>
           </div>
         </div>
         <div className="progress" aria-label={`${finished} of ${total} spots done in this field`}><i style={{ width: `${total ? finished / total * 100 : 0}%` }} /></div>
-        {!candidate || !crop ? <div className="stage-empty">The detector found nothing to review in this field. Pick another one above.</div> : <>
+        {complete && !training ? <div className="field-done">
+          <span className="done-mark"><Icon name="check" size={28} /></span>
+          <h3>All {total} spots in {tile.manifest.title} have your answer.</h3>
+          <p>Thank you. Your answers are combined with everyone else’s; the hidden tests among them measure how reliable each answer is.</p>
+          <div className="tally">{tally.map(c => <div key={c.label}><Pictogram label={c.label} /><strong>{c.n}</strong><span>{c.title}</span></div>)}</div>
+          {others.length > 0 && <><p className="next-label">Keep going in another field:</p>
+            <div className="next-fields">{others.map(t => <button key={t.tile_id} className="button secondary compact" onClick={() => p.onField(t)}>{t.title} <Icon name="arrow" size={13} /></button>)}</div></>}
+        </div> : !candidate || !crop ? <div className="stage-empty">The detector found nothing to review in this field. Pick another one above.</div> : <>
           <div className="loop">
             {frame && <FrameCanvas tile={tile} k={frame.cube_index ?? fi} options={{ view, crop }} label={`Close-up, photograph ${k + 1} of ${seq.length}`} />}
             <svg viewBox={`0 0 ${side} ${side}`} aria-hidden="true">
@@ -183,26 +195,28 @@ export default function ClassifyPage(p: Props) {
       </section>
 
       <aside className="ask">
+        {complete && !training ? <div className="ready"><strong>Field complete.</strong> Pick another field above or below, or practise again.</div> : <>
         <h2>What is the glowing dot doing?</h2>
         <div className="choices">{CHOICES.map((c, i) => <button key={c.label} disabled={!candidate} onClick={() => p.onVote(c.label)}
           className={'choice ' + (answered?.label === c.label ? 'chosen ' : '') + (training && answered && candidate?.suggested_label === c.label ? 'correct' : '')}>
           <Pictogram label={c.label} /><span><strong>{c.title}</strong><small>{c.hint}</small></span><kbd>{i + 1}</kbd>
         </button>)}</div>
+        </>}
 
         {training && answered && candidate?.suggested_label && <div className={'verdict ' + (right ? 'right' : 'wrong')}>
           <strong>{right ? 'Correct!' : 'Not quite.'}</strong> This one {ANSWER[candidate.suggested_label]}
-          <button className="button primary compact" onClick={p.onNext}>Next example <Icon name="arrow" size={14} /></button>
+          {complete ? <button className="button primary compact" onClick={p.onRealData}>Classify real data <Icon name="arrow" size={14} /></button>
+            : <button className="button primary compact" onClick={p.onNext}>Next example <Icon name="arrow" size={14} /></button>}
         </div>}
         {training && finished >= total && total > 0 && <div className="ready"><strong>You’re ready.</strong> Real SPHEREx spots are messier than these, and that is exactly why people help.
           <button className="button primary" onClick={p.onRealData}>Classify real data <Icon name="arrow" size={16} /></button></div>}
-        {!training && answered && <div className={'vote-status ' + (answered.status === 'pending' ? 'warning' : '')}>
+        {!training && answered && !complete && <div className={'vote-status ' + (answered.status === 'pending' ? 'warning' : '')}>
           <Icon name={answered.status === 'pending' ? 'info' : 'check'} size={16} />{answered.status === 'submitted' ? 'Answer saved. Thank you!' : 'Saving…'}
           {answered.status === 'pending' && answered.error && <button className="text-button small" disabled={p.syncing} onClick={p.onRetry}>Retry</button>}
         </div>}
-        {!training && finished >= total && total > 0 && <div className="ready"><strong>Field complete.</strong> Every spot here has your answer. Pick another field above.</div>}
 
         <div className="ask-actions">
-          <button className="button secondary" disabled={!candidate} onClick={p.onNext}>{answered ? 'Next spot' : 'Skip'} <Icon name="arrow" size={14} /></button>
+          {!complete && <button className="button secondary" disabled={!candidate} onClick={p.onNext}>{answered ? 'Next spot' : 'Skip'} <Icon name="arrow" size={14} /></button>}
           {!training && <button className="text-button" onClick={p.onExplore}>Open the whole field</button>}
         </div>
 
